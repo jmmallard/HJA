@@ -1,0 +1,299 @@
+---
+title: "HJAdata"
+author: "Mallard"
+date: "10/24/2022"
+output: html_document
+---
+
+Loading packages and input data
+```{r packages, echo=FALSE}
+library(tidyverse)
+library(lubridate)
+library(ggplot2)
+```
+
+```{r inputData, echo=FALSE, message=FALSE}
+qRaw <- read_csv("Data/HF00402_v12.csv")
+metRaw <- read_csv("Data/MS00103_v8.csv")
+
+```
+Daily precip values are in mm. 
+
+Figuring out extents of data at met stations. 
+```{r metDataExtent, echo=FALSE, message=FALSE}
+metSiteLength <- metRaw %>% 
+  group_by(SITECODE) %>% 
+  summarise(
+    timeStart = min(DATE),
+    timeEnd = max(DATE)
+  ) %>% 
+  arrange(timeStart)
+
+metSiteLength
+```
+
+Per Steve PRIMET is the station to use, CS2MET is likely a bit too overgrown and may be undercatching.
+
+Filter and restructure met:
+- Only one site
+```{r metData, echo=FALSE, message=FALSE}
+met <- metRaw %>% 
+  filter(SITECODE == "PRIMET") %>% 
+  select(DATE,PRECIP_TOT_DAY) %>% 
+  rename(precip = PRECIP_TOT_DAY)
+```
+
+Filter and restructure q data for ONE SITE:
+- Total Q (in inches), rather than mean, max, min
+- Convert DATE from character to date format
+- Convert inches to mm
+```{r WS1q}
+qWS1 <- qRaw %>% 
+  filter(SITECODE == "GSWS01") %>% 
+  select(DATE,TOTAL_Q_AREA) %>% 
+  rename(runoff = TOTAL_Q_AREA) %>% 
+  mutate(DATE = mdy(DATE)) %>% 
+  mutate(runoff = runoff * 25.4)
+
+# This clunky line is dealing with the fact that ymd functions set default 2000 cutoff year at 1968. Might be a way to integrate this operation with piped operation above
+q$DATE[year(q$DATE)>2022] <- q$DATE[year(q$DATE)>2022] - years(100) 
+
+```
+
+Combine q and met data:
+- Reduce to common days
+- Filter to after WY2000
+- Add water year column
+```{r WS1data}
+WS1data <- merge(met,qWS1,by = 'DATE')
+
+WS1data <- WS1data[WS1data$DATE > as.Date('1999-09-30'),] %>% 
+  mutate(yr = year(DATE), mn = month(DATE)) %>% 
+  mutate(WY = ifelse(mn > 9, yr + 1, yr)) %>% 
+  select(-c(yr,mn))
+```
+
+Make some summary datasets:
+-Annual
+-Monthly
+```{r WS1summaries}
+WS1annual <- WS1data %>% 
+  group_by(WY) %>% 
+  summarize(runoff = sum(runoff),
+            precip = sum(precip, na.rm = TRUE)) %>% 
+  mutate(rr = runoff/precip,
+         ET = precip - runoff,
+         er = ET/precip) %>% 
+  ungroup()
+
+WS1monthly <- WS1data %>% 
+  group_by(DATE = floor_date(DATE, "month")) %>% 
+  summarize(runoff = sum(runoff),
+            precip = sum(precip, na.rm = TRUE)) %>%
+  mutate(rr = runoff/precip) %>% 
+  mutate(rr = ifelse(rr > 1, 1, rr)) %>% 
+  mutate(month = factor(strftime(DATE,"%b"),levels=month.abb)) %>% 
+  ungroup()
+
+# WS1months <- WS1monthly %>% 
+#   group_by(month) %>% 
+#   summarize(runoff = mean(runoff),
+#             precip = mean(precip),
+#             rr = mean(rr),
+#             rrsd = sd(rr)) %>% 
+#   summarize(runoffsd = sd(runoff),
+#             precipsd = sd(precip),
+#             rrsd = sd(rr)) %>% 
+#   ungroup
+```
+
+Make some plots:
+- Annual runoff, precip, rr
+- Monthly rr
+
+```{r WS1figs}
+#Annual
+annPr <- ggplot(data = WS1annual, aes(x=WY,y=precip)) + 
+  geom_bar(stat = 'identity', fill = 'steelblue')
+annR <- ggplot(data = WS1annual, aes(x=WY,y=runoff)) + 
+  geom_bar(stat = 'identity', fill = 'coral')
+annRR <- ggplot(data = WS1annual, aes(x=WY,y=rr)) + 
+  geom_bar(stat = 'identity', fill = 'darkolivegreen3')
+
+PrRR <- ggplot(data = WS1annual, aes(x=precip,y=rr)) +
+  geom_point(size=5)
+PrER <- ggplot(data = WS1annual, aes(x=precip,y=er)) +
+  geom_point(size=5)
+
+annPr
+annR
+annRR
+PrRR
+PrER
+
+#Monthly
+monRr <- ggplot(data = WS1monthly, aes(x=DATE,y=rr)) + 
+  geom_bar(stat = 'identity', fill = 'darkolivegreen3')
+monRrBox <- ggplot(data = WS1monthly, aes(x=month, y = rr)) +
+  geom_boxplot()
+
+monRr
+monRrBox
+```
+
+Now lets put some datasets together for multiple watersheds (including WS1)
+- WSs 1,2,3,10
+- Total Q (in inches), rather than mean, max, min
+- Convert DATE from character to date format
+- Convert inches to mm
+- Reformat as a wide table
+- Set dates past 2022 back to 20th century (caused by 2 digit dates in raw data)
+- Reduce to common days b/n met and q, but not all common days for watersheds
+- Add water year column
+
+```{r WSdata}
+#Q data
+allQData <- qRaw %>% 
+  filter(SITECODE %in% c("GSWS01","GSWS02","GSWS03","GSWS10")) %>% 
+  select(DATE,TOTAL_Q_AREA,SITECODE) %>% 
+  rename(runoff = TOTAL_Q_AREA) %>% 
+  mutate(DATE = mdy(DATE)) %>% 
+  mutate(runoff = runoff * 25.4) %>% 
+  pivot_wider(names_from = SITECODE,values_from = runoff) %>% 
+  rename(WS1 = GSWS01,
+         WS2 = GSWS02,
+         WS3 = GSWS03,
+         WS10 = GSWS10) %>% 
+  mutate(DATE = if_else(year(DATE)>2022,DATE-years(100),DATE)) #ymd function has trouble with 2 digit years
+  
+#Merge with met data
+allData <- merge(met, allQData, by='DATE') %>%
+  mutate(yr = year(DATE), mn = month(DATE)) %>%
+  mutate(WY = ifelse(mn > 9, yr + 1, yr)) %>%
+  select(-c(yr,mn))
+```
+
+Make some figures with this larger dataset:
+- Runoff annual
+- Runoff ratio boxplots
+- Runoff ratio annual values
+
+```{r allWSfigs}
+#Annual RR and precip for each WS
+#WS1
+WS1 <- allData %>% 
+  group_by(WY) %>% 
+  summarize(runoff = sum(WS1),
+            precip = sum(precip, na.rm = TRUE)) %>% 
+  mutate(rr = runoff/precip)
+
+WS1Q <- ggplot(WS1, aes(x=WY,y=runoff)) + 
+  geom_bar(stat = 'identity', fill = 'steelblue')
+WS1RR <- ggplot(WS1, aes(x=WY,y=rr)) + 
+  geom_bar(stat = 'identity', fill = 'darkmagenta')
+
+#WS2
+WS2 <- allData %>% 
+  group_by(WY) %>% 
+  summarize(runoff = sum(WS2),
+            precip = sum(precip, na.rm = TRUE)) %>% 
+  mutate(rr = runoff/precip)
+
+WS2Q <- ggplot(WS2, aes(x=WY,y=runoff)) + 
+  geom_bar(stat = 'identity', fill = 'steelblue')
+WS2RR <- ggplot(WS2, aes(x=WY,y=rr)) + 
+  geom_bar(stat = 'identity', fill = 'darkmagenta')
+
+#WS3
+WS3 <- allData %>% 
+  group_by(WY) %>% 
+  summarize(runoff = sum(WS3, na.rm = TRUE),
+            precip = sum(precip, na.rm = TRUE)) %>% 
+  mutate(rr = runoff/precip)
+
+WS3Q <- ggplot(WS3, aes(x=WY,y=runoff)) + 
+  geom_bar(stat = 'identity', fill = 'steelblue')
+WS3RR <- ggplot(WS3, aes(x=WY,y=rr)) + 
+  geom_bar(stat = 'identity', fill = 'darkmagenta')
+
+#WS10
+WS10 <- allData %>% 
+  group_by(WY) %>% 
+  summarize(runoff = sum(WS10),
+            precip = sum(precip, na.rm = TRUE)) %>% 
+  mutate(rr = runoff/precip)
+
+WS10Q <- ggplot(WS10, aes(x=WY,y=runoff)) + 
+  geom_bar(stat = 'identity', fill = 'steelblue')
+WS10RR <- ggplot(WS10, aes(x=WY,y=rr)) + 
+  geom_bar(stat = 'identity', fill = 'darkmagenta')
+
+#Boxplots of monthly RR for each 
+#WS1
+WS1mon <- allData %>% 
+  group_by(DATE = floor_date(DATE, "month")) %>% 
+  summarize(runoff = sum(WS1, na.rm = TRUE),
+            precip = sum(precip, na.rm = TRUE)) %>%
+  mutate(rr = runoff/precip) %>% 
+  mutate(rr = ifelse(rr > 1, 1, rr)) %>% 
+  mutate(month = factor(strftime(DATE,"%b"),levels=month.abb)) %>% 
+  ungroup()
+
+WS1monRR <- ggplot(data = WS1mon, aes(x=month, y = rr)) +
+  geom_boxplot()
+
+#WS2
+WS2mon <- allData %>% 
+  group_by(DATE = floor_date(DATE, "month")) %>% 
+  summarize(runoff = sum(WS2, na.rm = TRUE),
+            precip = sum(precip, na.rm = TRUE)) %>%
+  mutate(rr = runoff/precip) %>% 
+  mutate(rr = ifelse(rr > 1, 1, rr)) %>% 
+  mutate(month = factor(strftime(DATE,"%b"),levels=month.abb)) %>% 
+  ungroup()
+
+WS2monRR <- ggplot(data = WS2mon, aes(x=month, y = rr)) +
+  geom_boxplot()
+
+#WS3
+WS3mon <- allData %>% 
+  group_by(DATE = floor_date(DATE, "month")) %>% 
+  summarize(runoff = sum(WS3, na.rm = TRUE),
+            precip = sum(precip, na.rm = TRUE)) %>%
+  mutate(rr = runoff/precip) %>% 
+  mutate(rr = ifelse(rr > 1, 1, rr)) %>% 
+  mutate(month = factor(strftime(DATE,"%b"),levels=month.abb)) %>% 
+  ungroup()
+
+WS3monRR <- ggplot(data = WS3mon, aes(x=month, y = rr)) +
+  geom_boxplot()
+
+#WS10
+WS10mon <- allData %>% 
+  group_by(DATE = floor_date(DATE, "month")) %>% 
+  summarize(runoff = sum(WS10, na.rm = TRUE),
+            precip = sum(precip, na.rm = TRUE)) %>%
+  mutate(rr = runoff/precip) %>% 
+  mutate(rr = ifelse(rr > 1, 1, rr)) %>% 
+  mutate(month = factor(strftime(DATE,"%b"),levels=month.abb)) %>% 
+  ungroup()
+
+WS10monRR <- ggplot(data = WS10mon, aes(x=month, y = rr)) +
+  geom_boxplot()
+
+#Print these plots
+WS1Q
+WS1RR
+WS2Q
+WS2RR
+WS3Q
+WS3RR
+WS10Q
+WS10RR
+
+WS1monRR
+WS2monRR
+WS3monRR
+WS10monRR
+```
+
