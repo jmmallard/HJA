@@ -10,14 +10,16 @@ Loading packages and input data
 library(tidyverse)
 library(lubridate)
 library(ggplot2)
+library(zoo)
 ```
 
 ```{r inputData, echo=FALSE, message=FALSE}
 qRaw <- read_csv("Data/HF00402_v12.csv")
 metRaw <- read_csv("Data/MS00103_v8.csv")
+tempRaw <- read_csv("Data/HT00401_v8.csv")
 
 ```
-Daily precip values are in mm. 
+Daily precip values are in mm, daily q in inches (normalized to area)
 
 Figuring out extents of data at met stations. 
 ```{r metDataExtent, echo=FALSE, message=FALSE}
@@ -150,7 +152,7 @@ Now lets put some datasets together for multiple watersheds (including WS1)
 - Set dates past 2022 back to 20th century (caused by 2 digit dates in raw data)
 - Reduce to common days b/n met and q, but not all common days for watersheds
 - Add water year column
-
+- Merge with "met" variable from "metData" chunk
 ```{r WSdata}
 #Q data
 allQData <- qRaw %>% 
@@ -177,7 +179,6 @@ Make some figures with this larger dataset:
 - Runoff annual
 - Runoff ratio boxplots
 - Runoff ratio annual values
-
 ```{r allWSfigs}
 #Annual RR and precip for each WS
 #WS1
@@ -297,3 +298,73 @@ WS3monRR
 WS10monRR
 ```
 
+Use allData to redo dataset for ws2 and add 7day mean low flow. Create annual time series from it
+```{r ws2LowFlow}
+#Find running 7 day mean
+WS2data <- allData %>% 
+  select(DATE, precip, WS2, WY) %>% 
+  rename(Q = WS2) %>% 
+  mutate(Low7Day = rollmean(Q,
+                            7,
+                            fill = NA,
+                            na.rm = FALSE,
+                            align = "center"))
+
+# #Plot and subset to check data
+WS2data %>%
+  filter(DATE > mdy("4-01-1986") & DATE < mdy("11-01-1986")) %>%
+  ggplot(aes(DATE, Q, color = "daily"))+
+    geom_line()+
+    geom_line(aes(x = DATE, y = Low7Day, color = "7 day mean"))
+
+# testSubset<-WS2data %>%
+#   filter(DATE > mdy("01-01-1987") & DATE < mdy("12-31-1987"))
+
+#Create annual low flow, along with total precip and date of low flow, add precip for preceding WY
+#Discard 1979 and 2018 for incomplete data
+WS2LowFlow <- WS2data %>% 
+  mutate(Year = year(DATE)) %>% 
+  group_by(Year) %>% 
+  summarize(minQ = min(Low7Day, na.rm = TRUE),
+            minQDate = DATE[which.min(Low7Day)],
+            annP = sum(precip, na.rm = TRUE)) %>% 
+  mutate(minQDoy = yday(minQDate))
+
+WS2WYprecip<- WS2data %>% 
+  group_by(WY) %>% 
+  summarize(annPWY = sum(precip, na.rm = TRUE))
+
+WS2LowFlow$annPWY <- WS2WYprecip$annPWY
+
+WS2LowFlow <- WS2LowFlow %>% 
+  filter(Year != 1979 & Year != 2018)
+
+#Some figures summarizing this annual dataset
+WS2LowFlow %>% 
+  ggplot(aes(y = minQ)) +
+  geom_boxplot() +
+  scale_x_discrete() +
+  labs(y = "7 day min daily runoff (mm)") 
+WS2LowFlow %>% 
+  ggplot(aes(y = minQDoy)) +
+  geom_boxplot() +
+  scale_x_discrete() +
+  labs(y = "7 day min day of year (mm)") 
+WS2LowFlow %>% 
+  ggplot(aes(y = annP)) +
+  geom_boxplot() +
+  scale_x_discrete() +
+  labs(y = "annual precip (mm)")
+  
+#Figures comparing them
+ggplot(data = WS2LowFlow, aes(x = minQDoy, y = minQ))+
+  geom_point()+
+  labs(x = "7 day min day of year (mm)", y = "7 day min daily runoff (mm)")
+ggplot(data = WS2LowFlow, aes(x = annP, y = minQ))+
+  geom_point()+
+   labs(x = "annual precip (mm)", y = "7 day min daily runoff (mm)")
+ggplot(data = WS2LowFlow, aes(x = annPWY, y = minQ))+
+  geom_point()+
+   labs(x = "prior WY precip (mm)", y = "7 day min daily runoff (mm)")
+
+```
