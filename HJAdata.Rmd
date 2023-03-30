@@ -15,23 +15,22 @@ library(climwin)
 ```
 
 Input data catalog:
-- HF00402: Flow data, daily runoff in
+- HF00402: Flow data, daily runoff in (normalized to area)
 - MS00103: Precip data, mm
 - HT00401: Temp @ gauges, deg C [per SteveW likely to be lower quality temp enclosures]
 - MS00101: Daily (min/max/mean) Temp @ met stations, deg C
 - MS00108: vpd (min/max/mean) @ met stations, mb
 ```{r inputData, echo=FALSE, message=FALSE}
 qRaw <- read.csv("Data/HF00402_v12.csv")
-metRaw <- read.csv("Data/MS00103_v8.csv")
+precipRaw <- read.csv("Data/MS00103_v8.csv")
 tempRaw <- read.csv("Data/MS00101_v9.csv")
 vpdRaw <- read.csv("Data/MS00108_v9.csv")
 
 ```
-Daily precip values are in mm, daily q in inches (normalized to area)
 
 Figuring out extents of data at met stations. 
 ```{r metDataExtent, echo=FALSE, message=FALSE}
-metSiteLength <- metRaw %>% 
+metSiteLength <- precipRaw %>% 
   group_by(SITECODE) %>% 
   summarise(
     timeStart = min(DATE),
@@ -42,19 +41,38 @@ metSiteLength <- metRaw %>%
 metSiteLength
 ```
 
-Per SteveW PRIMET is the station to use, CS2MET is likely a bit too overgrown and may be undercatching.
+Per Steve Wondzell PRIMET is the station to use for precip, CS2MET is likely a bit too overgrown and may be undercatching. PRIMET also site to use for vpd and temp per Chris Daly.
 
 Filter and restructure met:
 - Only one site
+- Combine temp, vpd, and precip
 ```{r metData, echo=FALSE, message=FALSE}
-met <- metRaw %>% 
+metPrecip <- precipRaw %>% 
   filter(SITECODE == "PRIMET") %>% 
   select(DATE,PRECIP_TOT_DAY) %>% 
   rename(precip = PRECIP_TOT_DAY) %>% 
   mutate(DATE = as_date(DATE))
+
+metTemp <- tempRaw %>% 
+  filter(SITECODE == "PRIMET") %>% 
+  select(DATE,AIRTEMP_MEAN_DAY,AIRTEMP_MAX_DAY,AIRTEMP_MIN_DAY) %>% 
+  rename(meanTemp = AIRTEMP_MEAN_DAY, maxTemp = AIRTEMP_MAX_DAY, minTemp = AIRTEMP_MIN_DAY) %>% 
+  mutate(DATE = as_date(DATE))
+  
+metVpd <- vpdRaw %>% 
+  filter(SITECODE == "PRIMET") %>% 
+  select(DATE,VPD_MEAN_DAY,VPD_MAX_DAY,VPD_MIN_DAY) %>% 
+  rename(meanVpd = VPD_MEAN_DAY, maxVpd = VPD_MAX_DAY, minVpd = VPD_MIN_DAY) %>% 
+  mutate(DATE = as_date(DATE))
+
+#Create a list of these data frames and then use reduce to sequentially do a full join
+metList <- list(metPrecip, metTemp, metVpd)
+
+met <- metList %>% 
+  reduce(full_join, by = "DATE")
 ```
 
-Filter and restructure q data for ONE SITE:
+Filter and restructure q data for WS1:
 - Total Q (in inches), rather than mean, max, min
 - Convert DATE from character to date format
 - Convert inches to mm
@@ -162,7 +180,8 @@ Now lets put some datasets together for multiple watersheds (including WS1)
 - Reduce to common days b/n met and q, but not all common days for watersheds
 - Add water year column
 - Merge with "met" variable from "metData" chunk to record length of met data
-```{r WSdata}
+  - This adds precip, temp (mean, max, min), and vpd (mean, max, min)
+```{r allWSdata}
 #Q data
 allQData <- qRaw %>% 
   filter(SITECODE %in% c("GSWS01","GSWS02","GSWS03","GSWS10")) %>% 
@@ -177,8 +196,8 @@ allQData <- qRaw %>%
          WS10 = GSWS10) %>% 
   mutate(DATE = if_else(year(DATE)>2022,DATE-years(100),DATE)) #ymd function has trouble with 2 digit years
   
-#Merge with met data
-allData <- merge(met, allQData, by='DATE') %>%
+#Merge with met data, add WY column
+allData <- full_join(met, allQData, by='DATE') %>%
   mutate(yr = year(DATE), mn = month(DATE)) %>%
   mutate(WY = ifelse(mn > 9, yr + 1, yr)) %>%
   select(-c(yr,mn))
@@ -517,5 +536,27 @@ plotweights(dataset = winModels)
 
 ```
 
+Calculating PET for WS2
+- Input data is daily temp
+- Calculate estimated monthly PET from Thornwaite method: https://en.wikipedia.org/wiki/Potential_evaporation for example
+  - PET = 16 * (L/12) * (N/30) * (10Td/I)^a
+  - L: average day length of the month at that location
+  - N: # of days in the month
+  - Td: Average daily temperature in the month
+  - a: (6.75e-7) * I^3 - (7.71e-5) * I^2 + (1.792e-2) * I + 0.49239
+  - I (site heat index): sum((Tdi/5)^1.514) for i = 1:12
+  - Tdi: Mean monthly temp for month i
+  
+```{r WS2PET_Thorn}
+#Setting up input values
+monthData <- allData %>% 
+  
+
 ```
+
+Then, use PET to calculate storage in WS2
+- Input data is daily PET, runoff, and precip
+- Water balance eqn: deltaS = P - ET - Q
+- Assume PET ~= ET bc energy limited at HJA
+
 
