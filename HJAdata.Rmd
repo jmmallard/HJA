@@ -549,8 +549,19 @@ Calculating PET for WS2
   
 ```{r WS2PET_Thorn}
 #Setting up input values
+hjaLat <- 44.23 #For daylength calcs
+
 monthData <- allData %>% 
-  
+  select(DATE,meanTemp) %>% 
+  mutate(doy = yday(DATE)) %>% 
+  mutate(dayLength = chillR::daylength(hjaLat,doy)[[3]]) %>% 
+  group_by(month = floor_date(DATE, "month")) %>% 
+  summarise(meanMonTemp = mean(meanTemp, na.rm = "TRUE"),
+            meanDaylength = mean(dayLength, na.rm = "TRUE")) %>% 
+  na.omit %>% 
+  mutate(monthDays = as.numeric(days_in_month(month)))
+
+#
 
 ```
 
