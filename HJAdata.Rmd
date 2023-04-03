@@ -536,38 +536,86 @@ plotweights(dataset = winModels)
 
 ```
 
-Calculating PET for WS2
+Calculating PET for HJA using PRIMET data
 - Input data is daily temp
 - Calculate estimated monthly PET from Thornwaite method: https://en.wikipedia.org/wiki/Potential_evaporation for example
   - PET = 16 * (L/12) * (N/30) * (10Td/I)^a
   - L: average day length of the month at that location
   - N: # of days in the month
-  - Td: Average daily temperature in the month
+  - Td: Average daily temperature in the month; 0 if temp is <0
   - a: (6.75e-7) * I^3 - (7.71e-5) * I^2 + (1.792e-2) * I + 0.49239
   - I (site heat index): sum((Tdi/5)^1.514) for i = 1:12
   - Tdi: Mean monthly temp for month i
   
-```{r WS2PET_Thorn}
+```{r PET_Thorn}
 #Setting up input values
 hjaLat <- 44.23 #For daylength calcs
 
 monthData <- allData %>% 
   select(DATE,meanTemp) %>% 
-  mutate(doy = yday(DATE)) %>% 
-  mutate(dayLength = chillR::daylength(hjaLat,doy)[[3]]) %>% 
+  mutate(doy = yday(DATE)) %>% #Create day of year variable
+  mutate(dayLength = chillR::daylength(hjaLat,doy)[[3]]) %>% #Get daylength for each of these
   group_by(month = floor_date(DATE, "month")) %>% 
   summarise(meanMonTemp = mean(meanTemp, na.rm = "TRUE"),
-            meanDaylength = mean(dayLength, na.rm = "TRUE")) %>% 
+            meanDaylength = mean(dayLength, na.rm = "TRUE")) %>% #Summarize into monthly means for temp and daylength
   na.omit %>% 
-  mutate(monthDays = as.numeric(days_in_month(month)))
+  mutate(meanMonTempTh = ifelse(meanMonTemp > 0, meanMonTemp, 0)) %>% #Create temp variable that is 0 if temp is below 0
+  mutate(monthDays = as.numeric(days_in_month(month))) %>%  #Calculate days in month for each month
+  mutate(monthYear = year(month))
 
-#
+#Find years that aren't 12 complete months bc heat index in Thornwaithe calculation requires 12 months
+monthCounts <- monthData %>% 
+  select(monthYear) %>% 
+  mutate(monthsTemp = 1) %>% 
+  group_by(monthYear) %>% 
+  summarise(monthCounts = sum(monthsTemp))
 
+incompleteYears <- monthCounts$monthYear[monthCounts$monthCounts != 12]
+
+#Remove years from monthData that don't have 12 months
+monthData <- monthData %>% 
+  filter(!(monthYear %in% incompleteYears))
+
+#Calculate heat index I for each month, sum to yearly heat index, calculate exponent alpha
+thornHeatI <- monthData %>% 
+  select(month, monthYear, meanMonTempTh) %>% 
+  mutate(monI = (meanMonTempTh/5)^1.514) %>% 
+  group_by(monthYear) %>% 
+  summarise(heatI = sum(monI)) %>% 
+  mutate(aThorn = (6.75e-7 * heatI^3) - (7.71e-5 * heatI^2) + (0.01792 * heatI) + 0.49239)
+
+#Join thornHeatI to monthData so there's a yearly heat index value for each month and calculate monthly/daily PET
+thornPET <- left_join(monthData, thornHeatI, by = "monthYear") %>% 
+  mutate(thornMonPET = 16 * (meanDaylength / 12) * (monthDays / 30) * (10 * meanMonTempTh / heatI)^aThorn) %>% 
+  mutate(thornDayPET = thornMonPET / monthDays) %>% 
+  select(month,monthDays,thornMonPET,thornDayPET)
 ```
 
 Then, use PET to calculate storage in WS2
-- Input data is daily PET, runoff, and precip
+- Input data is daily/monthly PET, daily runoff, and daily precip
+- Make monthly summaries of Q and P
 - Water balance eqn: deltaS = P - ET - Q
 - Assume PET ~= ET bc energy limited at HJA
 
+```{r WS2_Storage}
+#Create WS2 daily dataset from allData and thornPET
+WS2Storage <- allData %>% 
+  select(DATE,precip,WS2,WY) %>% 
+  rename(runoff = WS2) %>% 
+  na.omit() %>% 
+  mutate(dateMonth = floor_date(DATE,"month")) %>% 
+  left_join(., thornPET, by = c("dateMonth" = "month")) %>% 
+  mutate(delS = precip - runoff - thornDayPET) %>% 
+  mutate(dayS = cumsum(delS))
+```
+
+Some figs of storage in WS2
+```{r WS2_storage_figs}
+ggplot(data = WS2Storage, aes(DATE,dayS)) +
+  geom_line()
+
+ggplot(data = WS2Storage, aes(DATE,delS)) +
+  geom_point()
+
+```
 
