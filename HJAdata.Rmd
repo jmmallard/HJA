@@ -634,11 +634,16 @@ ggplot(data = WS2Storage, aes(DATE,dayS)) +
 ggplot(data = WS2Storage, aes(DATE,delS)) +
   geom_point()
 
-WS2Storage %>% 
+WS2StorageAnnual <- WS2Storage %>% 
   group_by(WY) %>% 
-  summarise(yearlyPET = sum(thornDayPET)) %>% 
-  ggplot() + geom_bar(aes(x = WY, y = yearlyPET), stat = "identity")
+  summarise(yearlyPET = sum(thornDayPET, na.rm = T), 
+            yearlyRunoff = sum(runoff, na.rm = T),
+            yearlyPrecip = sum(precip, na.rm = T))
 
+ggplot(data = WS2StorageAnnual) + geom_bar(aes(x = WY, y = yearlyPET), stat = "identity") + scale_y_continuous(limits = c(0,3000))
+ggplot(data = WS2StorageAnnual) + geom_bar(aes(x = WY, y = yearlyRunoff), stat = "identity") + scale_y_continuous(limits = c(0,3000))
+ggplot(data = WS2StorageAnnual) + geom_bar(aes(x = WY, y = yearlyPrecip), stat = "identity") + scale_y_continuous(limits = c(0,3000))
+ggplot(data = WS2StorageAnnual) + geom_bar(aes(x = WY, y = (yearlyPET+yearlyRunoff)), stat = "identity") + scale_y_continuous(limits = c(0,3000))
 ```
 
 Troubleshooting of primet data to explain odd figures in previous chunk
