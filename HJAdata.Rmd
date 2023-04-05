@@ -12,6 +12,7 @@ library(lubridate)
 library(ggplot2)
 library(zoo)
 library(climwin)
+library(plotly)
 ```
 
 Input data catalog:
@@ -46,6 +47,13 @@ Per Steve Wondzell PRIMET is the station to use for precip, CS2MET is likely a b
 Filter and restructure met:
 - Only one site
 - Combine temp, vpd, and precip
+- Filtering:
+  - Temp
+    - Sensor heights = 1.5 m.
+    - Probe 5 and 6, and the brief period between 5 and 6 with no measurements use probe 4
+  - Vpd
+    - Sensor height = 1.5 m
+    - Probe 5 or probe 4 after 2000-5-29
 ```{r metData, echo=FALSE, message=FALSE}
 metPrecip <- precipRaw %>% 
   filter(SITECODE == "PRIMET") %>% 
@@ -55,15 +63,24 @@ metPrecip <- precipRaw %>%
 
 metTemp <- tempRaw %>% 
   filter(SITECODE == "PRIMET") %>% 
+  mutate(DATE = as_date(DATE)) %>% 
+  filter(HEIGHT == 150) %>% 
+  filter(!(PROBE_CODE == "AIRPRI03")) %>% 
+  filter(PROBE_CODE %in% c("AIRPRI06", "AIRPRI05") | 
+           (PROBE_CODE == "AIRPRI04" & between(DATE, as.Date("2004-6-15"), as.Date("2004-6-25")))) %>% 
   select(DATE,AIRTEMP_MEAN_DAY,AIRTEMP_MAX_DAY,AIRTEMP_MIN_DAY) %>% 
-  rename(meanTemp = AIRTEMP_MEAN_DAY, maxTemp = AIRTEMP_MAX_DAY, minTemp = AIRTEMP_MIN_DAY) %>% 
-  mutate(DATE = as_date(DATE))
-  
+  rename(meanTemp = AIRTEMP_MEAN_DAY, maxTemp = AIRTEMP_MAX_DAY, minTemp = AIRTEMP_MIN_DAY)
+
 metVpd <- vpdRaw %>% 
   filter(SITECODE == "PRIMET") %>% 
+  mutate(DATE = as_date(DATE)) %>% 
+  filter(HEIGHT == 150) %>% 
+  filter((PROBE_CODE == "VPDPRI05") |
+           ((PROBE_CODE == "VPDPRI04") & (DATE > as_date("2000-05-29")))
+           ) %>% 
   select(DATE,VPD_MEAN_DAY,VPD_MAX_DAY,VPD_MIN_DAY) %>% 
-  rename(meanVpd = VPD_MEAN_DAY, maxVpd = VPD_MAX_DAY, minVpd = VPD_MIN_DAY) %>% 
-  mutate(DATE = as_date(DATE))
+  rename(meanVpd = VPD_MEAN_DAY, maxVpd = VPD_MAX_DAY, minVpd = VPD_MIN_DAY)
+  
 
 #Create a list of these data frames and then use reduce to sequentially do a full join
 metList <- list(metPrecip, metTemp, metVpd)
@@ -617,5 +634,135 @@ ggplot(data = WS2Storage, aes(DATE,dayS)) +
 ggplot(data = WS2Storage, aes(DATE,delS)) +
   geom_point()
 
+WS2Storage %>% 
+  group_by(WY) %>% 
+  summarise(yearlyPET = sum(thornDayPET)) %>% 
+  ggplot() + geom_bar(aes(x = WY, y = yearlyPET), stat = "identity")
+
+```
+
+Troubleshooting of primet data to explain odd figures in previous chunk
+```{r PRIMET_troubleshooting}
+#First, let's check for duplicate data in allData data frame
+# tsAllData <- allData %>% 
+#   mutate(tsYear = year(DATE)) %>% 
+#   count(tsYear)
+
+#Starting in 1994 amount of data increased by almost 10 fold
+
+
+#Check some of the variables for multiple options
+unique(tsRawPrecipData$PRECIP_METHOD)
+unique(tsRawPrecipData$PROBE_CODE)
+
+#Temp
+tsRawTempData <- tempRaw %>% 
+  filter(SITECODE == "PRIMET") %>% 
+  mutate(DATE = as_date(DATE))
+
+#Check some of the variables for multiple options
+unique(tsRawTempData$AIRTEMP_METHOD)
+unique(tsRawTempData$PROBE_CODE)
+
+#Multiple values for all of these. Check in raw data where duplicate days coming from
+#Filter to 1994 in both data
+tsRawPrecipDataSub <- tsRawPrecipData %>% 
+  filter(between(DATE, as.Date('1994-01-01'), as.Date('1994-12-31')))
+
+tsRawTempDataSub <- tsRawTempData %>% 
+  filter(between(DATE, as.Date('1980-01-01'), as.Date('1980-12-31')))
+
+
+#For temp, what heights are available through the record
+tempHeights <- tsRawTempData %>% 
+  select(HEIGHT,DATE) %>% 
+  mutate(myYears = year(DATE)) %>% 
+  filter(HEIGHT == 150) %>% 
+  group_by(myYears) %>% 
+  count(HEIGHT)
+
+
+unique(tempHeights$HEIGHT)
+
+#Ok, so filtering temp data to 150 m only. Now figure out what other unique values
+# tsRawTempData <- tempRaw %>% 
+#   filter(SITECODE == "PRIMET") %>% 
+#   mutate(DATE = as_date(DATE)) %>% 
+#   filter(HEIGHT == 150)
+# 
+# unique(tsRawTempData$AIRTEMP_METHOD)
+# unique(tsRawTempData$PROBE_CODE)
+# 
+# sensorExtent <- ggplot(data = tsRawTempData) + 
+#   geom_point(aes(x = DATE, y = as.factor(PROBE_CODE)))
+# 
+# sensorExtent
+# 
+# ggplotly(sensorExtent)
+
+#Filtering additionally to sensors 5,6, and a few days of 4
+tsRawTempData <- tempRaw %>% 
+  filter(SITECODE == "PRIMET") %>% 
+  mutate(DATE = as_date(DATE)) %>% 
+  filter(HEIGHT == 150) %>% 
+  filter(!(PROBE_CODE == "AIRPRI03")) %>% 
+  filter(PROBE_CODE %in% c("AIRPRI06", "AIRPRI05") | 
+           (PROBE_CODE == "AIRPRI04" & between(DATE, as.Date("2004-6-15"), as.Date("2004-6-25"))))
+
+sensorExtent <- ggplot(data = tsRawTempData) + 
+  geom_point(aes(x = DATE, y = as.factor(PROBE_CODE)))
+
+sensorExtent
+
+ggplotly(sensorExtent)
+
+#Filtering to methods
+unique(tsRawTempData$AIRTEMP_METHOD)
+unique(tsRawTempData$PROBE_CODE)
+
+#Method time extents
+sensorExtent <- ggplot(data = tsRawTempData) +
+  geom_point(aes(x = DATE, y = as.factor(AIRTEMP_METHOD)))
+
+sensorExtent
+
+ggplotly(sensorExtent)
+
+#Similar work on filtering precip data
+tsRawPrecipData <- precipRaw %>% 
+  filter(SITECODE == "PRIMET") %>% 
+  mutate(DATE = as_date(DATE))
+
+unique(tsRawPrecipData$PROBE_CODE)
+unique(tsRawPrecipData$PRECIP_METHOD)
+
+sensorExtent <- ggplot(data = tsRawPrecipData) +
+  geom_point(aes(x = DATE, y = as.factor(PRECIP_METHOD)))
+
+ggplotly(sensorExtent)
+
+nrow(tsRawPrecipData)
+length(unique(tsRawPrecipData$DATE))
+
+#Same filtering with vpd data
+tsRawVpdData <- vpdRaw %>% 
+  filter(SITECODE == "PRIMET") %>% 
+  mutate(DATE = as_date(DATE)) %>% 
+  filter(HEIGHT == 150) %>% 
+  filter((PROBE_CODE == "VPDPRI05") |
+           ((PROBE_CODE == "VPDPRI04") & (DATE > as_date("2000-05-29")))
+           )
+
+unique(tsRawVpdData$PROBE_CODE)
+unique(tsRawVpdData$VPD_METHOD)
+unique(tsRawVpdData$HEIGHT)
+
+sensorExtent <- ggplot(data = tsRawVpdData) +
+  geom_point(aes(x = DATE, y = as.factor(PROBE_CODE)))
+
+ggplotly(sensorExtent)
+
+#Still to-do:
+#Sort out flags on data to remove low-quality measurements
 ```
 
