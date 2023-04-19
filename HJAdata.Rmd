@@ -511,29 +511,69 @@ ggplot(data = WS1LowFlow, aes(x = minQDoy, y = minQ))+
   geom_point()+
   labs(x = "7 day min day of year (mm)", y = "7 day min daily runoff (mm)")
 ```
+Calculate a 7-day low flow for all days and the same day every year in WS1,2,3,10. Same day is 7-day window centered on 8/30, doy = 242. 
+Should add code to dynamically generate variable names from WS names!
+```{r WS2LowFlowAug}
+WSLowFlowData <- allData %>% 
+  select(DATE, precip, WS1, WS2, WS3, WS10, meanVpd, meanTemp, WY) %>% 
+  mutate(WS1Low = rollmean(WS1, 7, fill = NA, na.rm = FALSE, align = "center"),
+         WS2Low = rollmean(WS2, 7, fill = NA, na.rm = FALSE, align = "center"),
+         WS3Low = rollmean(WS3, 7, fill = NA, na.rm = FALSE, align = "center"),
+         WS10Low = rollmean(WS10, 7, fill = NA, na.rm = FALSE, align = "center"))
+
+#Subsetting and plotting                            
+# allData %>%
+#   filter(DATE > mdy("1-01-1996") & DATE < mdy("12-01-1996")) %>%
+#   ggplot(aes(DATE, WS3, color = "daily")) +
+#   geom_line()
+
+#Create annual aug low flow
+#Discard before 1979 and after 2018 for incomplete data
+WSLowFlowAnn <- WSLowFlowData %>% 
+  mutate(Year = year(DATE)) %>% 
+  group_by(Year) %>% 
+  summarize(WS1minQAug = WS1Low[yday(DATE) == 242],
+            WS2minQAug = WS2Low[yday(DATE) == 242],
+            WS3minQAug = WS3Low[yday(DATE) == 242],
+            WS10minQAug = WS10Low[yday(DATE) == 242]) %>% 
+  filter(Year > 1979 & Year < 2019)
+
+#Check where variables exist for WS2Data
+# imputeTS::ggplot_na_distribution(x = WS2data$meanVpd, x_axis_labels = WS2data$DATE)
+
+```
 
 
 Exploratory analysis using WSXLowFlow data and climate variables with climwin package. Separate execution bc of runtime
-- extract data for WS2 in this case
+- extract data for all WS low flow Aug 30
 - slidingwin does not work with NAs in the predictive (climate) data. Replace those values with 0 for now
 ```{r ClimaWinData}
 climData <- allData %>% 
-  select(DATE,precip) %>% 
+  select(DATE,precip,meanTemp) %>% 
   mutate(txtDate = format(DATE,"%d/%m/%Y"))
 
 climData$precip[is.na(climData$precip)] <- 0
+climData$meanTemp[is.na(climData$meanTemp)] <- 0
 
-lowFlowData <- WS2LowFlow %>% 
-  select(minQDate,minQ) %>% 
-  mutate(txtData = format(minQDate,"%d/%m/%Y"))
+lowFlowData <- WSLowFlowAnn %>% 
+  select(WS1minQAug, WS2minQAug, WS3minQAug, WS10minQAug, Year) %>% 
+  mutate(txtDate = paste0("30/08/",Year)) #Add 30-08-XXXX formatted date
 ```
 
-Execute climwin main function 
+Execute climwin main function for multiple watersheds
 ```{r ClimaWinDataExec}
-winOut <- slidingwin(xvar = list(climData$precip),
+WSvarnames <- c("WS1minQAug","WS2minQAug","WS3minQAug","WS3minQAug")
+climWinModels <- vector(mode = "list", length = length(WSvarnames)) #preallocate list
+
+for (i in 1:length(WSvarnames)){
+  lowFlowTemp <- lowFlowData %>% #Extract specific WS and remove rows with NA
+    select(Year, txtDate, minQ = WSvarnames[i]) %>% 
+    drop_na()
+    
+  winOutPrecip <- slidingwin(xvar = list(climData$precip),
                      cdate = climData$txtDate,
-                     bdate = lowFlowData$txtData,
-                     baseline = lm(minQ ~ 1, data = lowFlowData),
+                     bdate = lowFlowTemp$txtDate,
+                     baseline = lm(minQ ~ 1, data = lowFlowTemp),
                      cinterval = "day",
                      range = c(365,0),
                      type = "relative",
@@ -541,15 +581,16 @@ winOut <- slidingwin(xvar = list(climData$precip),
                      func = "lin"
                      )
 
-winModels <- winOut[[1]]$Dataset
+climWinModels[[i]] <- winOutPrecip[[1]]$Dataset
+}
 ```
 
 Visualize data tables and plots using built in functions
 ```{r ClimaWinDataVis}
-head(winModels)
+head(climWinModels[[4]])
 
-plotdelta(dataset = winModels)
-plotweights(dataset = winModels)
+plotdelta(dataset = climWinModels[[4]])
+plotweights(dataset = climWinModels[[4]])
 
 ```
 
@@ -644,6 +685,7 @@ ggplot(data = WS2StorageAnnual) + geom_bar(aes(x = WY, y = yearlyPET), stat = "i
 ggplot(data = WS2StorageAnnual) + geom_bar(aes(x = WY, y = yearlyRunoff), stat = "identity") + scale_y_continuous(limits = c(0,3000))
 ggplot(data = WS2StorageAnnual) + geom_bar(aes(x = WY, y = yearlyPrecip), stat = "identity") + scale_y_continuous(limits = c(0,3000))
 ggplot(data = WS2StorageAnnual) + geom_bar(aes(x = WY, y = (yearlyPET+yearlyRunoff)), stat = "identity") + scale_y_continuous(limits = c(0,3000))
+ggplot(data = WS2StorageAnnual) + geom_bar(aes(x = WY, y = (yearlyPrecip-yearlyRunoff)), stat = "identity") + scale_y_continuous(limits = c(0,3000))
 ```
 
 Troubleshooting of primet data to explain odd figures in previous chunk
@@ -769,5 +811,8 @@ ggplotly(sensorExtent)
 
 #Still to-do:
 #Sort out flags on data to remove low-quality measurements
+#Look through discharge data to do the same
+
+
 ```
 
