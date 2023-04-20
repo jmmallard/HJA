@@ -562,7 +562,7 @@ lowFlowData <- WSLowFlowAnn %>%
 
 Execute climwin main function for multiple watersheds
 ```{r ClimaWinDataExec}
-WSvarnames <- c("WS1minQAug","WS2minQAug","WS3minQAug","WS3minQAug")
+WSvarnames <- c("WS1minQAug","WS2minQAug","WS3minQAug","WS10minQAug")
 climWinModels <- vector(mode = "list", length = length(WSvarnames)) #preallocate list
 
 for (i in 1:length(WSvarnames)){
@@ -575,7 +575,7 @@ for (i in 1:length(WSvarnames)){
                      bdate = lowFlowTemp$txtDate,
                      baseline = lm(minQ ~ 1, data = lowFlowTemp),
                      cinterval = "day",
-                     range = c(365,0),
+                     range = c(365,10),
                      type = "relative",
                      stat = "mean",
                      func = "lin"
@@ -585,12 +585,21 @@ climWinModels[[i]] <- winOutPrecip[[1]]$Dataset
 }
 ```
 
-Visualize data tables and plots using built in functions
+Visualize data tables and plots using built in functions. Added loop to plot multiples
 ```{r ClimaWinDataVis}
-head(climWinModels[[4]])
+for (i in 1:length(WSvarnames)) {
+  plot1 <- plotwin(dataset = climWinModels[[i]]) + ggtitle(paste0("Open/close for 95% set ", WSvarnames[i]))
+  plot2 <- plotdelta(dataset = climWinModels[[i]]) + ggtitle(paste0("Model AICs for ", WSvarnames[i]))
+  plot3 <- plotweights(dataset = climWinModels[[i]]) + ggtitle(paste0("95% set for ", WSvarnames[i]))
+  print(plot1)
+  print(plot2)
+  print(plot3)
+}
 
-plotdelta(dataset = climWinModels[[4]])
-plotweights(dataset = climWinModels[[4]])
+# head(climWinModels[[4]])
+# 
+# plotdelta(dataset = climWinModels[[4]])
+# plotweights(dataset = climWinModels[[4]])
 
 ```
 
