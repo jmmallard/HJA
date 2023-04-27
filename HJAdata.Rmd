@@ -4,6 +4,13 @@ author: "Mallard"
 date: "10/24/2022"
 output: html_document
 ---
+Outputs of this script are:
+- allData: combined Q and met daily data
+- allQData: daily Q data from WS1,2,3,10
+- met: daily all met variables including precip, temp, vpd (max min mean of the latter two)
+- metXXXX: daily individual met variables 
+- XXXraw: loaded csv data from HJA data portal. No restructuring or filtering
+
 
 Loading packages and input data
 ```{r packages, echo=FALSE, message=FALSE, warning=FALSE}
@@ -87,6 +94,8 @@ metList <- list(metPrecip, metTemp, metVpd)
 
 met <- metList %>% 
   reduce(full_join, by = "DATE")
+
+rm(metList) #Cleanup environment
 ```
 
 Now lets put some datasets together for multiple watersheds (including WS1)
