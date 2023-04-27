@@ -1,0 +1,723 @@
+---
+title: "HJA_Other_Analyses"
+author: "Mallard"
+date: "4/27/2023"
+output: html_document
+---
+
+This file is a grab bag of analyses done with the HJA data that don't easily fit into a stand alone file. Some of this is scratch, others didn't go anywhere. 
+
+Filter and restructure q data for WS1:
+- Total Q (in inches), rather than mean, max, min
+- Convert DATE from character to date format
+- Convert inches to mm
+```{r WS1q}
+qWS1 <- qRaw %>% 
+  filter(SITECODE == "GSWS01") %>% 
+  select(DATE,TOTAL_Q_AREA) %>% 
+  rename(runoff = TOTAL_Q_AREA) %>% 
+  mutate(DATE = mdy(DATE)) %>% 
+  mutate(runoff = runoff * 25.4)
+
+# This clunky line is dealing with the fact that ymd functions set default 2000 cutoff year at 1968. Might be a way to integrate this operation with piped operation above
+qWS1$DATE[year(qWS1$DATE)>2022] <- qWS1$DATE[year(qWS1$DATE)>2022] - years(100) 
+
+```
+
+Combine q and met data:
+- Reduce to common days
+- Filter to after WY2000
+- Add water year column
+```{r WS1data}
+WS1data <- merge(met,qWS1,by = 'DATE')
+
+WS1data <- WS1data[WS1data$DATE > as.Date('1999-09-30'),] %>% 
+  mutate(yr = year(DATE), mn = month(DATE)) %>% 
+  mutate(WY = ifelse(mn > 9, yr + 1, yr)) %>% 
+  select(-c(yr,mn))
+```
+
+Make some summary datasets:
+-Annual
+-Monthly
+```{r WS1summaries}
+WS1annual <- WS1data %>% 
+  group_by(WY) %>% 
+  summarize(runoff = sum(runoff),
+            precip = sum(precip, na.rm = TRUE)) %>% 
+  mutate(rr = runoff/precip,
+         ET = precip - runoff,
+         er = ET/precip) %>% 
+  ungroup()
+
+WS1monthly <- WS1data %>% 
+  group_by(DATE = floor_date(DATE, "month")) %>% 
+  summarize(runoff = sum(runoff),
+            precip = sum(precip, na.rm = TRUE)) %>%
+  mutate(rr = runoff/precip) %>% 
+  mutate(rr = ifelse(rr > 1, 1, rr)) %>% 
+  mutate(month = factor(strftime(DATE,"%b"),levels=month.abb)) %>% 
+  ungroup()
+
+# WS1months <- WS1monthly %>% 
+#   group_by(month) %>% 
+#   summarize(runoff = mean(runoff),
+#             precip = mean(precip),
+#             rr = mean(rr),
+#             rrsd = sd(rr)) %>% 
+#   summarize(runoffsd = sd(runoff),
+#             precipsd = sd(precip),
+#             rrsd = sd(rr)) %>% 
+#   ungroup
+```
+
+Make some plots:
+- Annual runoff, precip, rr
+- Monthly rr
+
+```{r WS1figs}
+#Annual
+annPr <- ggplot(data = WS1annual, aes(x=WY,y=precip)) + 
+  geom_bar(stat = 'identity', fill = 'steelblue')
+annR <- ggplot(data = WS1annual, aes(x=WY,y=runoff)) + 
+  geom_bar(stat = 'identity', fill = 'coral')
+annRR <- ggplot(data = WS1annual, aes(x=WY,y=rr)) + 
+  geom_bar(stat = 'identity', fill = 'darkolivegreen3')
+
+PrRR <- ggplot(data = WS1annual, aes(x=precip,y=rr)) +
+  geom_point(size=5)
+PrER <- ggplot(data = WS1annual, aes(x=precip,y=er)) +
+  geom_point(size=5)
+
+annPr
+annR
+annRR
+PrRR
+PrER
+
+#Monthly
+monRr <- ggplot(data = WS1monthly, aes(x=DATE,y=rr)) + 
+  geom_bar(stat = 'identity', fill = 'darkolivegreen3')
+monRrBox <- ggplot(data = WS1monthly, aes(x=month, y = rr)) +
+  geom_boxplot()
+
+monRr
+monRrBox
+```
+
+Make some figures with this larger dataset (allData):
+- Runoff annual
+- Runoff ratio boxplots
+- Runoff ratio annual values
+```{r allWSfigs}
+#Annual RR and precip for each WS
+#WS1
+WS1 <- allData %>% 
+  group_by(WY) %>% 
+  summarize(runoff = sum(WS1),
+            precip = sum(precip, na.rm = TRUE)) %>% 
+  mutate(rr = runoff/precip)
+
+WS1Q <- ggplot(WS1, aes(x=WY,y=runoff)) + 
+  geom_bar(stat = 'identity', fill = 'steelblue')
+WS1RR <- ggplot(WS1, aes(x=WY,y=rr)) + 
+  geom_bar(stat = 'identity', fill = 'darkmagenta')
+
+#WS2
+WS2 <- allData %>% 
+  group_by(WY) %>% 
+  summarize(runoff = sum(WS2),
+            precip = sum(precip, na.rm = TRUE)) %>% 
+  mutate(rr = runoff/precip)
+
+WS2Q <- ggplot(WS2, aes(x=WY,y=runoff)) + 
+  geom_bar(stat = 'identity', fill = 'steelblue')
+WS2RR <- ggplot(WS2, aes(x=WY,y=rr)) + 
+  geom_bar(stat = 'identity', fill = 'darkmagenta')
+
+#WS3
+WS3 <- allData %>% 
+  group_by(WY) %>% 
+  summarize(runoff = sum(WS3, na.rm = TRUE),
+            precip = sum(precip, na.rm = TRUE)) %>% 
+  mutate(rr = runoff/precip)
+
+WS3Q <- ggplot(WS3, aes(x=WY,y=runoff)) + 
+  geom_bar(stat = 'identity', fill = 'steelblue')
+WS3RR <- ggplot(WS3, aes(x=WY,y=rr)) + 
+  geom_bar(stat = 'identity', fill = 'darkmagenta')
+
+#WS10
+WS10 <- allData %>% 
+  group_by(WY) %>% 
+  summarize(runoff = sum(WS10),
+            precip = sum(precip, na.rm = TRUE)) %>% 
+  mutate(rr = runoff/precip)
+
+WS10Q <- ggplot(WS10, aes(x=WY,y=runoff)) + 
+  geom_bar(stat = 'identity', fill = 'steelblue')
+WS10RR <- ggplot(WS10, aes(x=WY,y=rr)) + 
+  geom_bar(stat = 'identity', fill = 'darkmagenta')
+
+#Boxplots of monthly RR for each 
+#WS1
+WS1mon <- allData %>% 
+  group_by(DATE = floor_date(DATE, "month")) %>% 
+  summarize(runoff = sum(WS1, na.rm = TRUE),
+            precip = sum(precip, na.rm = TRUE)) %>%
+  mutate(rr = runoff/precip) %>% 
+  mutate(rr = ifelse(rr > 1, 1, rr)) %>% 
+  mutate(month = factor(strftime(DATE,"%b"),levels=month.abb)) %>% 
+  ungroup()
+
+WS1monRR <- ggplot(data = WS1mon, aes(x=month, y = rr)) +
+  geom_boxplot()
+
+#WS2
+WS2mon <- allData %>% 
+  group_by(DATE = floor_date(DATE, "month")) %>% 
+  summarize(runoff = sum(WS2, na.rm = TRUE),
+            precip = sum(precip, na.rm = TRUE)) %>%
+  mutate(rr = runoff/precip) %>% 
+  mutate(rr = ifelse(rr > 1, 1, rr)) %>% 
+  mutate(month = factor(strftime(DATE,"%b"),levels=month.abb)) %>% 
+  ungroup()
+
+WS2monRR <- ggplot(data = WS2mon, aes(x=month, y = rr)) +
+  geom_boxplot()
+
+#WS3
+WS3mon <- allData %>% 
+  group_by(DATE = floor_date(DATE, "month")) %>% 
+  summarize(runoff = sum(WS3, na.rm = TRUE),
+            precip = sum(precip, na.rm = TRUE)) %>%
+  mutate(rr = runoff/precip) %>% 
+  mutate(rr = ifelse(rr > 1, 1, rr)) %>% 
+  mutate(month = factor(strftime(DATE,"%b"),levels=month.abb)) %>% 
+  ungroup()
+
+WS3monRR <- ggplot(data = WS3mon, aes(x=month, y = rr)) +
+  geom_boxplot()
+
+#WS10
+WS10mon <- allData %>% 
+  group_by(DATE = floor_date(DATE, "month")) %>% 
+  summarize(runoff = sum(WS10, na.rm = TRUE),
+            precip = sum(precip, na.rm = TRUE)) %>%
+  mutate(rr = runoff/precip) %>% 
+  mutate(rr = ifelse(rr > 1, 1, rr)) %>% 
+  mutate(month = factor(strftime(DATE,"%b"),levels=month.abb)) %>% 
+  ungroup()
+
+WS10monRR <- ggplot(data = WS10mon, aes(x=month, y = rr)) +
+  geom_boxplot()
+
+#Print these plots
+WS1Q
+WS1RR
+WS2Q
+WS2RR
+WS3Q
+WS3RR
+WS10Q
+WS10RR
+
+WS1monRR
+WS2monRR
+WS3monRR
+WS10monRR
+```
+
+Use allData to redo dataset for ws2 and add 7day mean low flow. Create annual time series from it
+```{r ws2LowFlow}
+#Find running 7 day mean
+WS2data <- allData %>% 
+  select(DATE, precip, WS2, WY) %>% 
+  rename(Q = WS2) %>% 
+  mutate(Low7Day = rollmean(Q,
+                            7,
+                            fill = NA,
+                            na.rm = FALSE,
+                            align = "center"))
+
+# #Plot and subset to check data
+WS2data %>%
+  filter(DATE > mdy("4-01-1986") & DATE < mdy("11-01-1986")) %>%
+  ggplot(aes(DATE, Q, color = "daily"))+
+    geom_line()+
+    geom_line(aes(x = DATE, y = Low7Day, color = "7 day mean"))
+
+# testSubset<-WS2data %>%
+#   filter(DATE > mdy("01-01-1987") & DATE < mdy("12-31-1987"))
+
+#Create annual low flow, along with total precip and date of low flow, add precip for preceding WY
+#Discard 1979 and 2018 for incomplete data
+WS2LowFlow <- WS2data %>% 
+  mutate(Year = year(DATE)) %>% 
+  group_by(Year) %>% 
+  summarize(minQ = min(Low7Day, na.rm = TRUE),
+            minQDate = DATE[which.min(Low7Day)],
+            annP = sum(precip, na.rm = TRUE)) %>% 
+  mutate(minQDoy = yday(minQDate))
+
+WS2WYprecip<- WS2data %>% 
+  group_by(WY) %>% 
+  summarize(annPWY = sum(precip, na.rm = TRUE))
+
+WS2LowFlow$annPWY <- WS2WYprecip$annPWY
+
+WS2LowFlow <- WS2LowFlow %>% 
+  filter(Year != 1979 & Year != 2018)
+
+#Some figures summarizing this annual dataset
+WS2LowFlow %>% 
+  ggplot(aes(y = minQ)) +
+  geom_boxplot() +
+  scale_x_discrete() +
+  labs(y = "7 day min daily runoff (mm)")
+WS2LowFlow %>% 
+  ggplot(aes(x = Year, y = minQ)) +
+  geom_bar(stat = 'identity') +
+  labs(y = "7 day min daily runoff (mm)")
+
+WS2LowFlow %>% 
+  ggplot(aes(y = minQDoy)) +
+  geom_boxplot() +
+  scale_x_discrete() +
+  labs(y = "7 day min day of year (mm)") 
+WS2LowFlow %>% 
+  ggplot(aes(x = Year, y = minQDoy)) +
+  geom_bar(stat = 'identity') +
+  labs(y = "7 day min day of year (mm)")
+
+WS2LowFlow %>% 
+  ggplot(aes(y = annPWY)) +
+  geom_boxplot() +
+  scale_x_discrete() +
+  labs(y = "annual precip (mm)")
+WS2LowFlow %>% 
+  ggplot(aes(x = Year, y = annPWY)) +
+  geom_bar(stat = 'identity') +
+  labs(y = "annual precip (mm)")
+  
+#Figures comparing them
+# ggplot(data = WS2LowFlow, aes(x = annP, y = minQ))+
+#   geom_point()+
+#    labs(x = "annual precip (mm)", y = "7 day min daily runoff (mm)")
+ggplot(data = WS2LowFlow, aes(x = annPWY, y = minQ))+
+  geom_point()+
+   labs(x = "prior WY precip (mm)", y = "7 day min daily runoff (mm)")
+ggplot(data = WS2LowFlow, aes(x = minQDoy, y = minQ))+
+  geom_point()+
+  labs(x = "7 day min day of year (mm)", y = "7 day min daily runoff (mm)")
+
+```
+
+Do the same for WS1
+```{r ws1LowFlow}
+#Find running 7 day mean
+WS1data <- allData %>% 
+  select(DATE, precip, WS1, WY) %>% 
+  rename(Q = WS1) %>% 
+  mutate(Low7Day = rollmean(Q,
+                            7,
+                            fill = NA,
+                            na.rm = FALSE,
+                            align = "center"))
+
+# #Plot and subset to check data
+# WS1data %>%
+#   filter(DATE > mdy("4-01-1986") & DATE < mdy("11-01-1986")) %>%
+#   ggplot(aes(DATE, Q, color = "daily"))+
+#     geom_line()+
+#     geom_line(aes(x = DATE, y = Low7Day, color = "7 day mean"))
+
+# testSubset<-WS2data %>%
+#   filter(DATE > mdy("01-01-1987") & DATE < mdy("12-31-1987"))
+
+#Create annual low flow, along with total precip and date of low flow, add precip for preceding WY
+#Discard 1979 and 2018 for incomplete data
+WS1LowFlow <- WS1data %>% 
+  mutate(Year = year(DATE)) %>% 
+  group_by(Year) %>% 
+  summarize(minQ = min(Low7Day, na.rm = TRUE),
+            minQDate = DATE[which.min(Low7Day)],
+            annP = sum(precip, na.rm = TRUE)) %>% 
+  mutate(minQDoy = yday(minQDate))
+
+WS1WYprecip<- WS1data %>% 
+  group_by(WY) %>% 
+  summarize(annPWY = sum(precip, na.rm = TRUE))
+
+WS1LowFlow$annPWY <- WS1WYprecip$annPWY
+
+WS1LowFlow <- WS1LowFlow %>% 
+  filter(Year != 1979 & Year != 2018)
+
+#Some figures summarizing this annual dataset
+WS1LowFlow %>% 
+  ggplot(aes(y = minQ)) +
+  geom_boxplot() +
+  scale_x_discrete() +
+  labs(y = "7 day min daily runoff (mm)")
+WS1LowFlow %>% 
+  ggplot(aes(x = Year, y = minQ)) +
+  geom_bar(stat = 'identity') +
+  labs(y = "7 day min daily runoff (mm)")
+
+WS1LowFlow %>% 
+  ggplot(aes(y = minQDoy)) +
+  geom_boxplot() +
+  scale_x_discrete() +
+  labs(y = "7 day min day of year (mm)") 
+WS1LowFlow %>% 
+  ggplot(aes(x = Year, y = minQDoy)) +
+  geom_bar(stat = 'identity') +
+  labs(y = "7 day min day of year (mm)")
+
+WS1LowFlow %>% 
+  ggplot(aes(y = annPWY)) +
+  geom_boxplot() +
+  scale_x_discrete() +
+  labs(y = "annual precip (mm)")
+WS1LowFlow %>% 
+  ggplot(aes(x = Year, y = annPWY)) +
+  geom_bar(stat = 'identity') +
+  labs(y = "annual precip (mm)")
+  
+#Figures comparing them
+# ggplot(data = WS2LowFlow, aes(x = annP, y = minQ))+
+#   geom_point()+
+#    labs(x = "annual precip (mm)", y = "7 day min daily runoff (mm)")
+ggplot(data = WS1LowFlow, aes(x = annPWY, y = minQ))+
+  geom_point()+
+   labs(x = "prior WY precip (mm)", y = "7 day min daily runoff (mm)")
+ggplot(data = WS1LowFlow, aes(x = minQDoy, y = minQ))+
+  geom_point()+
+  labs(x = "7 day min day of year (mm)", y = "7 day min daily runoff (mm)")
+```
+Calculate a 7-day low flow for all days and the same day every year in WS1,2,3,10. Same day is 7-day window centered on 8/30, doy = 242. 
+Should add code to dynamically generate variable names from WS names!
+```{r WS2LowFlowAug}
+WSLowFlowData <- allData %>% 
+  select(DATE, precip, WS1, WS2, WS3, WS10, meanVpd, meanTemp, WY) %>% 
+  mutate(WS1Low = rollmean(WS1, 7, fill = NA, na.rm = FALSE, align = "center"),
+         WS2Low = rollmean(WS2, 7, fill = NA, na.rm = FALSE, align = "center"),
+         WS3Low = rollmean(WS3, 7, fill = NA, na.rm = FALSE, align = "center"),
+         WS10Low = rollmean(WS10, 7, fill = NA, na.rm = FALSE, align = "center"))
+
+#Subsetting and plotting                            
+# allData %>%
+#   filter(DATE > mdy("1-01-1996") & DATE < mdy("12-01-1996")) %>%
+#   ggplot(aes(DATE, WS3, color = "daily")) +
+#   geom_line()
+
+#Create annual aug low flow
+#Discard before 1979 and after 2018 for incomplete data
+WSLowFlowAnn <- WSLowFlowData %>% 
+  mutate(Year = year(DATE)) %>% 
+  group_by(Year) %>% 
+  summarize(WS1minQAug = WS1Low[yday(DATE) == 242],
+            WS2minQAug = WS2Low[yday(DATE) == 242],
+            WS3minQAug = WS3Low[yday(DATE) == 242],
+            WS10minQAug = WS10Low[yday(DATE) == 242]) %>% 
+  filter(Year > 1979 & Year < 2019)
+
+#Check where variables exist for WS2Data
+imputeTS::ggplot_na_distribution(x = WS2data$meanVpd, x_axis_labels = WS2data$DATE)
+imputeTS::ggplot_na_distribution(x = WS2data$meanTemp, x_axis_labels = WS2data$DATE)
+
+
+#Plot all aug 30 low-flows
+WSLowFlowAnn %>% 
+  gather(WS,lowFlowAug,c("WS1minQAug","WS2minQAug","WS3minQAug","WS10minQAug")) %>% 
+  ggplot(aes(x = Year, y = lowFlowAug, fill = WS)) + geom_bar(position = "dodge", stat = "identity") + theme_classic()
+
+WSLowFlowAnn %>% 
+  gather(WS,lowFlowAug,c("WS1minQAug","WS2minQAug","WS3minQAug","WS10minQAug")) %>% 
+  ggplot(aes(x = Year, y = lowFlowAug, color = WS)) + geom_line() + theme_classic()
+
+```
+
+
+Exploratory analysis using WSXLowFlow data and climate variables with climwin package. Separate execution bc of runtime
+- extract data for all WS low flow Aug 30
+- slidingwin does not work with NAs in the predictive (climate) data. Replace those values with 0 for now
+```{r ClimaWinData}
+climData <- allData %>% 
+  select(DATE,precip,meanTemp) %>% 
+  mutate(txtDate = format(DATE,"%d/%m/%Y"))
+
+climData$precip[is.na(climData$precip)] <- 0
+climData$meanTemp[is.na(climData$meanTemp)] <- 0
+
+lowFlowData <- WSLowFlowAnn %>% 
+  select(WS1minQAug, WS2minQAug, WS3minQAug, WS10minQAug, Year) %>% 
+  mutate(txtDate = paste0("30/08/",Year)) #Add 30-08-XXXX formatted date
+```
+
+Execute climwin main function for multiple watersheds
+```{r ClimaWinDataExec}
+WSvarnames <- c("WS1minQAug","WS2minQAug","WS3minQAug","WS10minQAug")
+climWinModels <- vector(mode = "list", length = length(WSvarnames)) #preallocate list
+
+for (i in 1:length(WSvarnames)){
+  lowFlowTemp <- lowFlowData %>% #Extract specific WS and remove rows with NA
+    select(Year, txtDate, minQ = WSvarnames[i]) %>% 
+    drop_na()
+    
+  winOut <- slidingwin(xvar = list(climData$meanTemp),
+                     cdate = climData$txtDate,
+                     bdate = lowFlowTemp$txtDate,
+                     baseline = lm(minQ ~ 1, data = lowFlowTemp),
+                     cinterval = "day",
+                     range = c(365,10),
+                     type = "relative",
+                     stat = "mean",
+                     func = "lin"
+                     )
+
+climWinModels[[i]] <- winOut[[1]]$Dataset
+}
+```
+
+Visualize data tables and plots using built in functions. Added loop to plot multiples
+```{r ClimaWinDataVis}
+for (i in 1:length(WSvarnames)) {
+  plot1 <- plotwin(dataset = climWinModels[[i]]) + ggtitle(paste0("Open/close for 95% set ", WSvarnames[i]))
+  plot2 <- plotdelta(dataset = climWinModels[[i]]) + ggtitle(paste0("Model AICs for ", WSvarnames[i]))
+  plot3 <- plotweights(dataset = climWinModels[[i]]) + ggtitle(paste0("95% set for ", WSvarnames[i]))
+  print(plot1)
+  print(plot2)
+  print(plot3)
+}
+
+# head(climWinModels[[4]])
+# 
+# plotdelta(dataset = climWinModels[[4]])
+# plotweights(dataset = climWinModels[[4]])
+
+```
+
+Calculating PET for HJA using PRIMET data
+- Input data is daily temp
+- Calculate estimated monthly PET from Thornwaite method: https://en.wikipedia.org/wiki/Potential_evaporation for example
+  - PET = 16 * (L/12) * (N/30) * (10Td/I)^a
+  - L: average day length of the month at that location
+  - N: # of days in the month
+  - Td: Average daily temperature in the month; 0 if temp is <0
+  - a: (6.75e-7) * I^3 - (7.71e-5) * I^2 + (1.792e-2) * I + 0.49239
+  - I (site heat index): sum((Tdi/5)^1.514) for i = 1:12
+  - Tdi: Mean monthly temp for month i
+  
+```{r PET_Thorn}
+#Setting up input values
+hjaLat <- 44.23 #For daylength calcs
+
+monthData <- allData %>% 
+  select(DATE,meanTemp) %>% 
+  mutate(doy = yday(DATE)) %>% #Create day of year variable
+  mutate(dayLength = chillR::daylength(hjaLat,doy)[[3]]) %>% #Get daylength for each of these
+  group_by(month = floor_date(DATE, "month")) %>% 
+  summarise(meanMonTemp = mean(meanTemp, na.rm = "TRUE"),
+            meanDaylength = mean(dayLength, na.rm = "TRUE")) %>% #Summarize into monthly means for temp and daylength
+  na.omit %>% 
+  mutate(meanMonTempTh = ifelse(meanMonTemp > 0, meanMonTemp, 0)) %>% #Create temp variable that is 0 if temp is below 0
+  mutate(monthDays = as.numeric(days_in_month(month))) %>%  #Calculate days in month for each month
+  mutate(monthYear = year(month))
+
+#Find years that aren't 12 complete months bc heat index in Thornwaithe calculation requires 12 months
+monthCounts <- monthData %>% 
+  select(monthYear) %>% 
+  mutate(monthsTemp = 1) %>% 
+  group_by(monthYear) %>% 
+  summarise(monthCounts = sum(monthsTemp))
+
+incompleteYears <- monthCounts$monthYear[monthCounts$monthCounts != 12]
+
+#Remove years from monthData that don't have 12 months
+monthData <- monthData %>% 
+  filter(!(monthYear %in% incompleteYears))
+
+#Calculate heat index I for each month, sum to yearly heat index, calculate exponent alpha
+thornHeatI <- monthData %>% 
+  select(month, monthYear, meanMonTempTh) %>% 
+  mutate(monI = (meanMonTempTh/5)^1.514) %>% 
+  group_by(monthYear) %>% 
+  summarise(heatI = sum(monI)) %>% 
+  mutate(aThorn = (6.75e-7 * heatI^3) - (7.71e-5 * heatI^2) + (0.01792 * heatI) + 0.49239)
+
+#Join thornHeatI to monthData so there's a yearly heat index value for each month and calculate monthly/daily PET
+thornPET <- left_join(monthData, thornHeatI, by = "monthYear") %>% 
+  mutate(thornMonPET = 16 * (meanDaylength / 12) * (monthDays / 30) * (10 * meanMonTempTh / heatI)^aThorn) %>% 
+  mutate(thornDayPET = thornMonPET / monthDays) %>% 
+  select(month,monthDays,thornMonPET,thornDayPET)
+```
+
+Then, use PET to calculate storage in WS2
+- Input data is daily/monthly PET, daily runoff, and daily precip
+- Make monthly summaries of Q and P
+- Water balance eqn: deltaS = P - ET - Q
+- Assume PET ~= ET bc energy limited at HJA
+
+```{r WS2_Storage}
+#Create WS2 daily dataset from allData and thornPET
+WS2Storage <- allData %>% 
+  select(DATE,precip,WS2,WY) %>% 
+  rename(runoff = WS2) %>% 
+  na.omit() %>% 
+  mutate(dateMonth = floor_date(DATE,"month")) %>% 
+  left_join(., thornPET, by = c("dateMonth" = "month")) %>% 
+  mutate(delS = precip - runoff - thornDayPET) %>% 
+  mutate(dayS = cumsum(delS))
+```
+
+Some figs of storage in WS2
+```{r WS2_storage_figs}
+ggplot(data = WS2Storage, aes(DATE,dayS)) +
+  geom_line()
+
+ggplot(data = WS2Storage, aes(DATE,delS)) +
+  geom_point()
+
+WS2StorageAnnual <- WS2Storage %>% 
+  group_by(WY) %>% 
+  summarise(yearlyPET = sum(thornDayPET, na.rm = T), 
+            yearlyRunoff = sum(runoff, na.rm = T),
+            yearlyPrecip = sum(precip, na.rm = T))
+
+ggplot(data = WS2StorageAnnual) + geom_bar(aes(x = WY, y = yearlyPET), stat = "identity") + scale_y_continuous(limits = c(0,3000))
+ggplot(data = WS2StorageAnnual) + geom_bar(aes(x = WY, y = yearlyRunoff), stat = "identity") + scale_y_continuous(limits = c(0,3000))
+ggplot(data = WS2StorageAnnual) + geom_bar(aes(x = WY, y = yearlyPrecip), stat = "identity") + scale_y_continuous(limits = c(0,3000))
+ggplot(data = WS2StorageAnnual) + geom_bar(aes(x = WY, y = (yearlyPET+yearlyRunoff)), stat = "identity") + scale_y_continuous(limits = c(0,3000))
+ggplot(data = WS2StorageAnnual) + geom_bar(aes(x = WY, y = (yearlyPrecip-yearlyRunoff)), stat = "identity") + scale_y_continuous(limits = c(0,3000))
+```
+
+Troubleshooting of primet data to explain odd figures in previous chunk
+```{r PRIMET_troubleshooting}
+#First, let's check for duplicate data in allData data frame
+# tsAllData <- allData %>% 
+#   mutate(tsYear = year(DATE)) %>% 
+#   count(tsYear)
+
+#Starting in 1994 amount of data increased by almost 10 fold
+
+
+#Check some of the variables for multiple options
+unique(tsRawPrecipData$PRECIP_METHOD)
+unique(tsRawPrecipData$PROBE_CODE)
+
+#Temp
+tsRawTempData <- tempRaw %>% 
+  filter(SITECODE == "PRIMET") %>% 
+  mutate(DATE = as_date(DATE))
+
+#Check some of the variables for multiple options
+unique(tsRawTempData$AIRTEMP_METHOD)
+unique(tsRawTempData$PROBE_CODE)
+
+#Multiple values for all of these. Check in raw data where duplicate days coming from
+#Filter to 1994 in both data
+tsRawPrecipDataSub <- tsRawPrecipData %>% 
+  filter(between(DATE, as.Date('1994-01-01'), as.Date('1994-12-31')))
+
+tsRawTempDataSub <- tsRawTempData %>% 
+  filter(between(DATE, as.Date('1980-01-01'), as.Date('1980-12-31')))
+
+
+#For temp, what heights are available through the record
+tempHeights <- tsRawTempData %>% 
+  select(HEIGHT,DATE) %>% 
+  mutate(myYears = year(DATE)) %>% 
+  filter(HEIGHT == 150) %>% 
+  group_by(myYears) %>% 
+  count(HEIGHT)
+
+
+unique(tempHeights$HEIGHT)
+
+#Ok, so filtering temp data to 150 m only. Now figure out what other unique values
+# tsRawTempData <- tempRaw %>% 
+#   filter(SITECODE == "PRIMET") %>% 
+#   mutate(DATE = as_date(DATE)) %>% 
+#   filter(HEIGHT == 150)
+# 
+# unique(tsRawTempData$AIRTEMP_METHOD)
+# unique(tsRawTempData$PROBE_CODE)
+# 
+# sensorExtent <- ggplot(data = tsRawTempData) + 
+#   geom_point(aes(x = DATE, y = as.factor(PROBE_CODE)))
+# 
+# sensorExtent
+# 
+# ggplotly(sensorExtent)
+
+#Filtering additionally to sensors 5,6, and a few days of 4
+tsRawTempData <- tempRaw %>% 
+  filter(SITECODE == "PRIMET") %>% 
+  mutate(DATE = as_date(DATE)) %>% 
+  filter(HEIGHT == 150) %>% 
+  filter(!(PROBE_CODE == "AIRPRI03")) %>% 
+  filter(PROBE_CODE %in% c("AIRPRI06", "AIRPRI05") | 
+           (PROBE_CODE == "AIRPRI04" & between(DATE, as.Date("2004-6-15"), as.Date("2004-6-25"))))
+
+sensorExtent <- ggplot(data = tsRawTempData) + 
+  geom_point(aes(x = DATE, y = as.factor(PROBE_CODE)))
+
+sensorExtent
+
+ggplotly(sensorExtent)
+
+#Filtering to methods
+unique(tsRawTempData$AIRTEMP_METHOD)
+unique(tsRawTempData$PROBE_CODE)
+
+#Method time extents
+sensorExtent <- ggplot(data = tsRawTempData) +
+  geom_point(aes(x = DATE, y = as.factor(AIRTEMP_METHOD)))
+
+sensorExtent
+
+ggplotly(sensorExtent)
+
+#Similar work on filtering precip data
+tsRawPrecipData <- precipRaw %>% 
+  filter(SITECODE == "PRIMET") %>% 
+  mutate(DATE = as_date(DATE))
+
+unique(tsRawPrecipData$PROBE_CODE)
+unique(tsRawPrecipData$PRECIP_METHOD)
+
+sensorExtent <- ggplot(data = tsRawPrecipData) +
+  geom_point(aes(x = DATE, y = as.factor(PRECIP_METHOD)))
+
+ggplotly(sensorExtent)
+
+nrow(tsRawPrecipData)
+length(unique(tsRawPrecipData$DATE))
+
+#Same filtering with vpd data
+tsRawVpdData <- vpdRaw %>% 
+  filter(SITECODE == "PRIMET") %>% 
+  mutate(DATE = as_date(DATE)) %>% 
+  filter(HEIGHT == 150) %>% 
+  filter((PROBE_CODE == "VPDPRI05") |
+           ((PROBE_CODE == "VPDPRI04") & (DATE > as_date("2000-05-29")))
+           )
+
+unique(tsRawVpdData$PROBE_CODE)
+unique(tsRawVpdData$VPD_METHOD)
+unique(tsRawVpdData$HEIGHT)
+
+sensorExtent <- ggplot(data = tsRawVpdData) +
+  geom_point(aes(x = DATE, y = as.factor(PROBE_CODE)))
+
+ggplotly(sensorExtent)
+
+#Still to-do:
+#Sort out flags on data to remove low-quality measurements
+#Look through discharge data to do the same
+
+
+```
+
