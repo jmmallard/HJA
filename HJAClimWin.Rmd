@@ -1,0 +1,65 @@
+---
+title: "HJAClimWin"
+output: html_notebook
+---
+
+Requires low flow data and met data from "all data"
+
+Exploratory analysis using WSXLowFlow data and climate variables with climwin package. Separate execution bc of runtime
+- extract data for all WS low flow Aug 30
+- slidingwin does not work with NAs in the predictive (climate) data. Replace those values with 0 for now
+```{r ClimaWinData}
+climData <- allData %>% 
+  select(DATE,precip,meanTemp) %>% 
+  mutate(txtDate = format(DATE,"%d/%m/%Y"))
+
+climData$precip[is.na(climData$precip)] <- 0
+climData$meanTemp[is.na(climData$meanTemp)] <- 0
+
+lowFlowData <- WSLowFlowAnn %>% 
+  select(WS1minQAug, WS2minQAug, WS3minQAug, WS10minQAug, Year) %>% 
+  mutate(txtDate = paste0("30/08/",Year)) #Add 30-08-XXXX formatted date
+```
+
+Execute climwin main function for multiple watersheds
+```{r ClimaWinDataExec}
+WSvarnames <- c("WS1minQAug","WS2minQAug","WS3minQAug","WS10minQAug")
+climWinModels <- vector(mode = "list", length = length(WSvarnames)) #preallocate list
+
+for (i in 1:length(WSvarnames)){
+  lowFlowTemp <- lowFlowData %>% #Extract specific WS and remove rows with NA
+    select(Year, txtDate, minQ = WSvarnames[i]) %>% 
+    drop_na()
+    
+  winOut <- slidingwin(xvar = list(climData$meanTemp),
+                     cdate = climData$txtDate,
+                     bdate = lowFlowTemp$txtDate,
+                     baseline = lm(minQ ~ 1, data = lowFlowTemp),
+                     cinterval = "day",
+                     range = c(365,10),
+                     type = "relative",
+                     stat = "mean",
+                     func = "lin"
+                     )
+
+climWinModels[[i]] <- winOut[[1]]$Dataset
+}
+```
+
+Visualize data tables and plots using built in functions. Added loop to plot multiples
+```{r ClimaWinDataVis}
+for (i in 1:length(WSvarnames)) {
+  plot1 <- plotwin(dataset = climWinModels[[i]]) + ggtitle(paste0("Open/close for 95% set ", WSvarnames[i]))
+  plot2 <- plotdelta(dataset = climWinModels[[i]]) + ggtitle(paste0("Model AICs for ", WSvarnames[i]))
+  plot3 <- plotweights(dataset = climWinModels[[i]]) + ggtitle(paste0("95% set for ", WSvarnames[i]))
+  print(plot1)
+  print(plot2)
+  print(plot3)
+}
+
+# head(climWinModels[[4]])
+# 
+# plotdelta(dataset = climWinModels[[4]])
+# plotweights(dataset = climWinModels[[4]])
+
+```
