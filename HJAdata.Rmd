@@ -134,7 +134,13 @@ allData <- full_join(met, allQData, by='DATE') %>%
   select(-c(yr,mn))
 ```
 
-Working on gap filling vpd
+Working on gap filling vpd.
+- Largest gaps are:
+  - 94-9-9:95-8-17
+  - 98-5-24:98-12-12
+  - These occur when only one vpd sensor is available
+- There is temp data at primet that could be used for a regression gap filling
+- Still need to check 15min vpd data to see if there's anything there
 ```{r VPD_Gaps}
 #Data as it's currently filtered
 vpdTS <- vpdRaw %>% 
@@ -228,6 +234,22 @@ tempTS3 <- tempRaw %>%
 ggplot_na_distribution(tempTS3$meanTemp)
 statsNA(tempTS3$meanTemp)
 
+#See if similar filtering as above with temp could be done with vpd to improve it
+vpdTS2 <- vpdRaw %>% 
+  filter(SITECODE == "PRIMET") %>% 
+  mutate(DATE = as_date(DATE)) 
+  # filter(PROBE_CODE == "VPDPRI01")
+  
+  # filter(HEIGHT == 150) %>% 
+  # filter((PROBE_CODE == "VPDPRI05") |
+  #          ((PROBE_CODE == "VPDPRI04") & (DATE > as_date("2000-05-29")))
+           # )
+
+ggplot_na_distribution(vpdTS2$VPD_MEAN_DAY, x_axis_labels = vpdTS2$DATE)
+
+ggplot(data = vpdTS2, aes(DATE, VPD_MEAN_DAY)) +
+  geom_point(color = "steelblue", size = 1) +
+  facet_wrap(~ PROBE_CODE)
 
 ```
 
