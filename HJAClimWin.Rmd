@@ -8,7 +8,7 @@ Requires low flow data and met data from "all data"
 Exploratory analysis using WSXLowFlow data and climate variables with climwin package. Separate execution bc of runtime
 - extract data for all WS low flow Aug 30
 - slidingwin does not work with NAs in the predictive (climate) data. Replace those values with 0 for now
-```{r ClimaWinData}
+```{r ClimWinData}
 climData <- allData %>% 
   select(DATE,precip,meanTemp) %>% 
   mutate(txtDate = format(DATE,"%d/%m/%Y"))

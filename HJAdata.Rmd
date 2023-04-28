@@ -11,6 +11,7 @@ Outputs of this script are:
 - metXXXX: daily individual met variables 
 - XXXraw: loaded csv data from HJA data portal. No restructuring or filtering
 
+Chunks at bottom are scratch to do some exploratory visualization and determine correct filtering for met data
 
 Loading packages and input data
 ```{r packages, echo=FALSE, message=FALSE, warning=FALSE}
@@ -20,6 +21,7 @@ library(ggplot2)
 library(zoo)
 library(climwin)
 library(plotly)
+library(imputeTS)
 ```
 
 Input data catalog:
@@ -56,8 +58,8 @@ Filter and restructure met:
 - Combine temp, vpd, and precip
 - Filtering:
   - Temp
-    - Sensor heights = 1.5 m.
-    - Probe 5 and 6, and the brief period between 5 and 6 with no measurements use probe 4
+    - Sensor heights = 1.5 m. (probes 4,5,6)
+    - Probe 5 and 6, or when there's no value for 5,6 use probe 4
   - Vpd
     - Sensor height = 1.5 m
     - Probe 5 or probe 4 after 2000-5-29
@@ -71,10 +73,11 @@ metPrecip <- precipRaw %>%
 metTemp <- tempRaw %>% 
   filter(SITECODE == "PRIMET") %>% 
   mutate(DATE = as_date(DATE)) %>% 
-  filter(HEIGHT == 150) %>% 
-  filter(!(PROBE_CODE == "AIRPRI03")) %>% 
-  filter(PROBE_CODE %in% c("AIRPRI06", "AIRPRI05") | 
-           (PROBE_CODE == "AIRPRI04" & between(DATE, as.Date("2004-6-15"), as.Date("2004-6-25")))) %>% 
+  filter(PROBE_CODE %in% c("AIRPRI06", "AIRPRI05", "AIRPRI04")) %>%
+  arrange(DATE, factor(PROBE_CODE, levels = c("AIRPRI06", "AIRPRI05", "AIRPRI04"))) %>% #Sort by probe order here
+  drop_na(AIRTEMP_MEAN_DAY) %>% 
+  distinct(DATE, .keep_all = TRUE) %>% #Takes the first value for that date, so probe 4 only taken if no 5 or 6
+  padr::pad() %>% #Add back NA values
   select(DATE,AIRTEMP_MEAN_DAY,AIRTEMP_MAX_DAY,AIRTEMP_MIN_DAY) %>% 
   rename(meanTemp = AIRTEMP_MEAN_DAY, maxTemp = AIRTEMP_MAX_DAY, minTemp = AIRTEMP_MIN_DAY)
 
@@ -129,5 +132,233 @@ allData <- full_join(met, allQData, by='DATE') %>%
   mutate(yr = year(DATE), mn = month(DATE)) %>%
   mutate(WY = ifelse(mn > 9, yr + 1, yr)) %>%
   select(-c(yr,mn))
+```
+
+Working on gap filling vpd
+```{r VPD_Gaps}
+#Data as it's currently filtered
+vpdTS <- vpdRaw %>% 
+  filter(SITECODE == "PRIMET") %>% 
+  mutate(DATE = as_date(DATE)) %>% 
+  filter(HEIGHT == 150) %>% 
+  filter((PROBE_CODE == "VPDPRI05") |
+           ((PROBE_CODE == "VPDPRI04") & (DATE > as_date("2000-05-29")))
+           )
+
+#Continuity of sensors
+sensorExtent <- ggplot(data = vpdTS) +
+  geom_point(aes(x = DATE, y = as.factor(PROBE_CODE)))
+
+#Missing day locations
+imputeTS::ggplot_na_distribution(x = vpdTS$VPD_MEAN_DAY, x_axis_labels = vpdTS$DATE)
+imputeTS::ggplot_na_gapsize(x = vpdTS$VPD_MEAN_DAY)
+
+imputeTS::statsNA(vpdTS$VPD_MEAN_DAY)
+
+vpdPlot <- ggplot(data = vpdTS) +
+  geom_point(aes(x = DATE, y = VPD_MEAN_DAY))
+# ggplotly(vpdPlot)
+
+#Check if temp could be used to gapfill vpd
+tempTS <- tempRaw %>% 
+  filter(SITECODE == "PRIMET") %>% 
+  mutate(DATE = as_date(DATE)) %>% 
+  filter(HEIGHT == 150) %>% 
+  filter(!(PROBE_CODE == "AIRPRI03")) %>% 
+  filter(PROBE_CODE %in% c("AIRPRI06", "AIRPRI05") | 
+           (PROBE_CODE == "AIRPRI04" & between(DATE, as.Date("2004-6-15"), as.Date("2004-6-25"))))
+
+imputeTS::ggplot_na_distribution(x = tempTS$AIRTEMP_MEAN_DAY, x_axis_labels = tempTS$DATE)
+
+imputeTS::statsNA(tempTS$AIRTEMP_MEAN_DAY)
+
+tempPlot <- ggplot(data = tempTS) +
+  geom_point(aes(x = DATE, y = AIRTEMP_MEAN_DAY))
+ggplotly(tempPlot)
+
+#Which NAs of vpd are covered by temp?
+vpdTempOverlap <- vpdTS %>% 
+  left_join(., tempTS, by = "DATE") %>% 
+  mutate(overlapTemp = case_when(!is.na(VPD_MEAN_DAY) ~ 2,
+                                 is.na(VPD_MEAN_DAY) & !is.na(AIRTEMP_MEAN_DAY) ~ 1,
+                                 TRUE ~ NA_real_))
+
+overlapPlot <- ggplot(data = vpdTempOverlap) +
+  geom_point(aes(x = DATE, y = overlapTemp))
+overlapPlot
+
+ggplot_na_distribution(vpdTempOverlap$overlapTemp, x_axis_labels = vpdTempOverlap$DATE)
+statsNA(vpdTempOverlap$overlapTemp)
+statsNA(vpdTempOverlap$VPD_MEAN_DAY)
+
+ggplot_na_distribution(vpdTempOverlap$AIRTEMP_MEAN_DAY, x_axis_labels = vpdTempOverlap$DATE)
+ggplot_na_distribution(vpdTempOverlap$VPD_MEAN_DAY, x_axis_labels = vpdTempOverlap$DATE)
+
+#Other temp values at PRIMET to use? Remove height and sensor filtering from temp
+tempTS2 <- tempRaw %>% 
+  filter(SITECODE == "PRIMET") %>% 
+  mutate(DATE = as_date(DATE))
+  # filter(between(DATE, as.Date("1998-01-01"), as.Date("1999-12-31"))) %>% 
+  # filter(PROBE_CODE == "AIRPRI05")
+  
+# ggplotly(
+ggplot(data = tempTS2) +
+  geom_point(aes(x = DATE, y = as.factor(PROBE_CODE)))
+# )
+
+ggplot(data = tempTS2, aes(DATE, AIRTEMP_MEAN_DAY)) +
+  geom_point(color = "steelblue", size = 1) +
+  facet_wrap(~ PROBE_CODE)
+  
+#Re-do temp sensor filtering above so that sensors are taken in order: 
+#6, 5, 4
+tempTS3 <- tempRaw %>% 
+  filter(SITECODE == "PRIMET") %>% 
+  mutate(DATE = as_date(DATE)) %>% 
+  filter(PROBE_CODE %in% c("AIRPRI06", "AIRPRI05", "AIRPRI04")) %>%
+  arrange(DATE, factor(PROBE_CODE, levels = c("AIRPRI06", "AIRPRI05", "AIRPRI04"))) %>% 
+  drop_na(AIRTEMP_MEAN_DAY) %>% 
+  distinct(DATE, .keep_all = TRUE) %>% 
+  padr::pad() %>% 
+  select(DATE,AIRTEMP_MEAN_DAY,AIRTEMP_MAX_DAY,AIRTEMP_MIN_DAY) %>% 
+  rename(meanTemp = AIRTEMP_MEAN_DAY, maxTemp = AIRTEMP_MAX_DAY, minTemp = AIRTEMP_MIN_DAY)
+
+
+
+ggplot_na_distribution(tempTS3$meanTemp)
+statsNA(tempTS3$meanTemp)
+
+
+```
+
+
+Troubleshooting of primet data to explain odd figures in previous chunk
+```{r PRIMET_troubleshooting}
+#First, let's check for duplicate data in allData data frame
+# tsAllData <- allData %>% 
+#   mutate(tsYear = year(DATE)) %>% 
+#   count(tsYear)
+
+#Starting in 1994 amount of data increased by almost 10 fold
+
+
+#Check some of the variables for multiple options
+unique(tsRawPrecipData$PRECIP_METHOD)
+unique(tsRawPrecipData$PROBE_CODE)
+
+#Temp
+tsRawTempData <- tempRaw %>% 
+  filter(SITECODE == "PRIMET") %>% 
+  mutate(DATE = as_date(DATE))
+
+#Check some of the variables for multiple options
+unique(tsRawTempData$AIRTEMP_METHOD)
+unique(tsRawTempData$PROBE_CODE)
+
+#Multiple values for all of these. Check in raw data where duplicate days coming from
+#Filter to 1994 in both data
+tsRawPrecipDataSub <- tsRawPrecipData %>% 
+  filter(between(DATE, as.Date('1994-01-01'), as.Date('1994-12-31')))
+
+tsRawTempDataSub <- tsRawTempData %>% 
+  filter(between(DATE, as.Date('1980-01-01'), as.Date('1980-12-31')))
+
+
+#For temp, what heights are available through the record
+tempHeights <- tsRawTempData %>% 
+  select(HEIGHT,DATE) %>% 
+  mutate(myYears = year(DATE)) %>% 
+  filter(HEIGHT == 150) %>% 
+  group_by(myYears) %>% 
+  count(HEIGHT)
+
+
+unique(tempHeights$HEIGHT)
+
+#Ok, so filtering temp data to 150 m only. Now figure out what other unique values
+# tsRawTempData <- tempRaw %>% 
+#   filter(SITECODE == "PRIMET") %>% 
+#   mutate(DATE = as_date(DATE)) %>% 
+#   filter(HEIGHT == 150)
+# 
+# unique(tsRawTempData$AIRTEMP_METHOD)
+# unique(tsRawTempData$PROBE_CODE)
+# 
+# sensorExtent <- ggplot(data = tsRawTempData) + 
+#   geom_point(aes(x = DATE, y = as.factor(PROBE_CODE)))
+# 
+# sensorExtent
+# 
+# ggplotly(sensorExtent)
+
+#Filtering additionally to sensors 5,6, and a few days of 4
+tsRawTempData <- tempRaw %>% 
+  filter(SITECODE == "PRIMET") %>% 
+  mutate(DATE = as_date(DATE)) %>% 
+  filter(HEIGHT == 150) %>% 
+  filter(!(PROBE_CODE == "AIRPRI03")) %>% 
+  filter(PROBE_CODE %in% c("AIRPRI06", "AIRPRI05") | 
+           (PROBE_CODE == "AIRPRI04" & between(DATE, as.Date("2004-6-15"), as.Date("2004-6-25"))))
+
+sensorExtent <- ggplot(data = tsRawTempData) + 
+  geom_point(aes(x = DATE, y = as.factor(PROBE_CODE)))
+
+sensorExtent
+
+ggplotly(sensorExtent)
+
+#Filtering to methods
+unique(tsRawTempData$AIRTEMP_METHOD)
+unique(tsRawTempData$PROBE_CODE)
+
+#Method time extents
+sensorExtent <- ggplot(data = tsRawTempData) +
+  geom_point(aes(x = DATE, y = as.factor(AIRTEMP_METHOD)))
+
+sensorExtent
+
+ggplotly(sensorExtent)
+
+#Similar work on filtering precip data
+tsRawPrecipData <- precipRaw %>% 
+  filter(SITECODE == "PRIMET") %>% 
+  mutate(DATE = as_date(DATE))
+
+unique(tsRawPrecipData$PROBE_CODE)
+unique(tsRawPrecipData$PRECIP_METHOD)
+
+sensorExtent <- ggplot(data = tsRawPrecipData) +
+  geom_point(aes(x = DATE, y = as.factor(PRECIP_METHOD)))
+
+ggplotly(sensorExtent)
+
+nrow(tsRawPrecipData)
+length(unique(tsRawPrecipData$DATE))
+
+#Same filtering with vpd data
+tsRawVpdData <- vpdRaw %>% 
+  filter(SITECODE == "PRIMET") %>% 
+  mutate(DATE = as_date(DATE)) %>% 
+  filter(HEIGHT == 150) %>% 
+  filter((PROBE_CODE == "VPDPRI05") |
+           ((PROBE_CODE == "VPDPRI04") & (DATE > as_date("2000-05-29")))
+           )
+
+unique(tsRawVpdData$PROBE_CODE)
+unique(tsRawVpdData$VPD_METHOD)
+unique(tsRawVpdData$HEIGHT)
+
+sensorExtent <- ggplot(data = tsRawVpdData) +
+  geom_point(aes(x = DATE, y = as.factor(PROBE_CODE)))
+
+ggplotly(sensorExtent)
+
+#Still to-do:
+#Sort out flags on data to remove low-quality measurements
+#Look through discharge data to do the same
+
+#Check where variables exist for WS2Data
+imputeTS::ggplot_na_distribution(x = WS2data$meanVpd, x_axis_labels = WS2data$DATE)
+imputeTS::ggplot_na_distribution(x = WS2data$meanTemp, x_axis_labels = WS2data$DATE)
 ```
 

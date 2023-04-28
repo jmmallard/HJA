@@ -175,6 +175,7 @@ ggplot(data = WS1LowFlow, aes(x = minQDoy, y = minQ))+
   geom_point()+
   labs(x = "7 day min day of year (mm)", y = "7 day min daily runoff (mm)")
 ```
+
 Calculate a 7-day low flow for all days and the same day every year in WS1,2,3,10. Same day is 7-day window centered on 8/30, doy = 242. 
 Should add code to dynamically generate variable names from WS names!
 ```{r WS2LowFlowAug}
