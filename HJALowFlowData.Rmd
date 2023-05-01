@@ -7,6 +7,44 @@ output: html_document
 
 This file creates an annual low flow dataset for use in other analyses.
 
+Calculate a 7-day low flow for all days and the same day every year in WS1,2,3,10. Same day is 7-day window centered on 8/30, doy = 242. 
+Should add code to dynamically generate variable names from WS names!
+```{r WSLowFlowAug}
+WSLowFlowData <- allData %>% 
+  select(DATE, precip, WS1, WS2, WS3, WS10, meanVpd, meanTemp, WY) %>% 
+  mutate(WS1Low = rollmean(WS1, 7, fill = NA, na.rm = FALSE, align = "center"),
+         WS2Low = rollmean(WS2, 7, fill = NA, na.rm = FALSE, align = "center"),
+         WS3Low = rollmean(WS3, 7, fill = NA, na.rm = FALSE, align = "center"),
+         WS10Low = rollmean(WS10, 7, fill = NA, na.rm = FALSE, align = "center"))
+
+#Subsetting and plotting                            
+# allData %>%
+#   filter(DATE > mdy("1-01-1996") & DATE < mdy("12-01-1996")) %>%
+#   ggplot(aes(DATE, WS3, color = "daily")) +
+#   geom_line()
+
+#Create annual aug low flow
+#Discard before 1979 and after 2018 for incomplete data
+WSLowFlowAnn <- WSLowFlowData %>% 
+  mutate(Year = year(DATE)) %>% 
+  group_by(Year) %>% 
+  summarize(WS1minQAug = WS1Low[yday(DATE) == 242],
+            WS2minQAug = WS2Low[yday(DATE) == 242],
+            WS3minQAug = WS3Low[yday(DATE) == 242],
+            WS10minQAug = WS10Low[yday(DATE) == 242]) %>% 
+  filter(Year > 1979 & Year < 2019)
+
+#Plot all aug 30 low-flows
+# WSLowFlowAnn %>% 
+#   gather(WS,lowFlowAug,c("WS1minQAug","WS2minQAug","WS3minQAug","WS10minQAug")) %>% 
+#   ggplot(aes(x = Year, y = lowFlowAug, fill = WS)) + geom_bar(position = "dodge", stat = "identity") + theme_classic()
+# 
+# WSLowFlowAnn %>% 
+#   gather(WS,lowFlowAug,c("WS1minQAug","WS2minQAug","WS3minQAug","WS10minQAug")) %>% 
+#   ggplot(aes(x = Year, y = lowFlowAug, color = WS)) + geom_line() + theme_classic()
+
+```
+
 Use allData to redo dataset for ws2 and add 7day mean low flow. Create annual time series from it
 ```{r ws2LowFlow}
 #Find running 7 day mean
@@ -176,45 +214,4 @@ ggplot(data = WS1LowFlow, aes(x = minQDoy, y = minQ))+
   labs(x = "7 day min day of year (mm)", y = "7 day min daily runoff (mm)")
 ```
 
-Calculate a 7-day low flow for all days and the same day every year in WS1,2,3,10. Same day is 7-day window centered on 8/30, doy = 242. 
-Should add code to dynamically generate variable names from WS names!
-```{r WS2LowFlowAug}
-WSLowFlowData <- allData %>% 
-  select(DATE, precip, WS1, WS2, WS3, WS10, meanVpd, meanTemp, WY) %>% 
-  mutate(WS1Low = rollmean(WS1, 7, fill = NA, na.rm = FALSE, align = "center"),
-         WS2Low = rollmean(WS2, 7, fill = NA, na.rm = FALSE, align = "center"),
-         WS3Low = rollmean(WS3, 7, fill = NA, na.rm = FALSE, align = "center"),
-         WS10Low = rollmean(WS10, 7, fill = NA, na.rm = FALSE, align = "center"))
 
-#Subsetting and plotting                            
-# allData %>%
-#   filter(DATE > mdy("1-01-1996") & DATE < mdy("12-01-1996")) %>%
-#   ggplot(aes(DATE, WS3, color = "daily")) +
-#   geom_line()
-
-#Create annual aug low flow
-#Discard before 1979 and after 2018 for incomplete data
-WSLowFlowAnn <- WSLowFlowData %>% 
-  mutate(Year = year(DATE)) %>% 
-  group_by(Year) %>% 
-  summarize(WS1minQAug = WS1Low[yday(DATE) == 242],
-            WS2minQAug = WS2Low[yday(DATE) == 242],
-            WS3minQAug = WS3Low[yday(DATE) == 242],
-            WS10minQAug = WS10Low[yday(DATE) == 242]) %>% 
-  filter(Year > 1979 & Year < 2019)
-
-#Check where variables exist for WS2Data
-imputeTS::ggplot_na_distribution(x = WS2data$meanVpd, x_axis_labels = WS2data$DATE)
-imputeTS::ggplot_na_distribution(x = WS2data$meanTemp, x_axis_labels = WS2data$DATE)
-
-
-#Plot all aug 30 low-flows
-WSLowFlowAnn %>% 
-  gather(WS,lowFlowAug,c("WS1minQAug","WS2minQAug","WS3minQAug","WS10minQAug")) %>% 
-  ggplot(aes(x = Year, y = lowFlowAug, fill = WS)) + geom_bar(position = "dodge", stat = "identity") + theme_classic()
-
-WSLowFlowAnn %>% 
-  gather(WS,lowFlowAug,c("WS1minQAug","WS2minQAug","WS3minQAug","WS10minQAug")) %>% 
-  ggplot(aes(x = Year, y = lowFlowAug, color = WS)) + geom_line() + theme_classic()
-
-```

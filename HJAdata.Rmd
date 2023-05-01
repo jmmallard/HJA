@@ -37,7 +37,7 @@ qRaw <- read.csv("Data/HF00402_v12.csv")
 precipRaw <- read.csv("Data/MS00103_v8.csv")
 tempRaw <- read.csv("Data/MS00101_v9.csv")
 vpdRaw <- read.csv("Data/MS00108_v9.csv")
-vpd60minRaw <- read.csv("Data/MS00118_v7.txt")
+# vpd60minRaw <- read.csv("Data/MS00118_v7.txt")
 rhRaw <- read.csv("Data/MS00102_v9.csv")
 ```
 

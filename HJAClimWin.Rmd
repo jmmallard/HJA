@@ -7,23 +7,40 @@ Requires low flow data and met data from "all data"
 
 Exploratory analysis using WSXLowFlow data and climate variables with climwin package. Separate execution bc of runtime
 - extract data for all WS low flow Aug 30
-- slidingwin does not work with NAs in the predictive (climate) data. Replace those values with 0 for now
+- slidingwin does not work with NAs in the predictive (climate) data. Replace those values with 0 for now in precip
 ```{r ClimWinData}
 climData <- allData %>% 
-  select(DATE,precip,meanTemp) %>% 
-  mutate(txtDate = format(DATE,"%d/%m/%Y"))
+  select(DATE, precip, meanTemp, meanVpd) %>% 
+  mutate(txtDate = format(DATE,"%d/%m/%Y")) %>% #Format data for use with slidingwin function
+  # filter(DATE > as.Date("1978-04-01")) #For when PRIMET came online
+  filter(DATE > as.Date("1988-07-12")) #For when vpd sensors came online
 
-climData$precip[is.na(climData$precip)] <- 0
-climData$meanTemp[is.na(climData$meanTemp)] <- 0
+# climData$precip[is.na(climData$precip)] <- 0
 
 lowFlowData <- WSLowFlowAnn %>% 
   select(WS1minQAug, WS2minQAug, WS3minQAug, WS10minQAug, Year) %>% 
-  mutate(txtDate = paste0("30/08/",Year)) #Add 30-08-XXXX formatted date
+  mutate(txtDate = paste0("30/08/",Year)) %>% 
+  filter(Year > 1989) #For use with vpd
+```
+
+Checking on data provided by Karla (EDI_met_daily_daytime_nighttime...)
+Make a similar climData df as above to plug into analyses
+```{r KJdata}
+load("Data/EDI_met_daily_daytime_nighttime_stats_20220505.Rdat")
+
+ggplot_na_distribution(metnighttime_final$vpdmean, x_axis_labels = metdaytime_final$date)
+
+climData <- metnighttime_final %>% 
+  select(DATE = date, meanVpd = vpdmean) %>% 
+  mutate(txtDate = format(DATE,"%d/%m/%Y"))
+
 ```
 
 Execute climwin main function for multiple watersheds
 ```{r ClimaWinDataExec}
-WSvarnames <- c("WS1minQAug","WS2minQAug","WS3minQAug","WS10minQAug")
+# WSvarnames <- c("WS1minQAug","WS2minQAug","WS3minQAug","WS10minQAug")
+WSvarnames <- "WS2minQAug"
+
 climWinModels <- vector(mode = "list", length = length(WSvarnames)) #preallocate list
 
 for (i in 1:length(WSvarnames)){
@@ -31,15 +48,16 @@ for (i in 1:length(WSvarnames)){
     select(Year, txtDate, minQ = WSvarnames[i]) %>% 
     drop_na()
     
-  winOut <- slidingwin(xvar = list(climData$meanTemp),
+  winOut <- slidingwin(xvar = list(climData$meanVpd),
                      cdate = climData$txtDate,
                      bdate = lowFlowTemp$txtDate,
                      baseline = lm(minQ ~ 1, data = lowFlowTemp),
                      cinterval = "day",
-                     range = c(365,10),
+                     range = c(365,0),
                      type = "relative",
                      stat = "mean",
-                     func = "lin"
+                     func = "lin",
+                     cmissing = "method2" #This method replaces missing values with mean value of all records with same date
                      )
 
 climWinModels[[i]] <- winOut[[1]]$Dataset
@@ -51,7 +69,7 @@ Visualize data tables and plots using built in functions. Added loop to plot mul
 for (i in 1:length(WSvarnames)) {
   plot1 <- plotwin(dataset = climWinModels[[i]]) + ggtitle(paste0("Open/close for 95% set ", WSvarnames[i]))
   plot2 <- plotdelta(dataset = climWinModels[[i]]) + ggtitle(paste0("Model AICs for ", WSvarnames[i]))
-  plot3 <- plotweights(dataset = climWinModels[[i]]) + ggtitle(paste0("95% set for ", WSvarnames[i]))
+  plot3 <- plotweights(dataset = climWinModels[[i]])
   print(plot1)
   print(plot2)
   print(plot3)
@@ -63,3 +81,8 @@ for (i in 1:length(WSvarnames)) {
 # plotweights(dataset = climWinModels[[4]])
 
 ```
+
+
+
+
+
