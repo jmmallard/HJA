@@ -30,25 +30,15 @@ Input data catalog:
 - HT00401: Temp @ gauges, deg C [per SteveW likely to be lower quality temp enclosures]
 - MS00101: Daily (min/max/mean) Temp @ met stations, deg C
 - MS00108: vpd (min/max/mean) @ met stations, mb
+- MS00118: vpd (60 min mean) @m met station, mb
+- MS00102: Relative humidity, %
 ```{r inputData, echo=FALSE, message=FALSE}
 qRaw <- read.csv("Data/HF00402_v12.csv")
 precipRaw <- read.csv("Data/MS00103_v8.csv")
 tempRaw <- read.csv("Data/MS00101_v9.csv")
 vpdRaw <- read.csv("Data/MS00108_v9.csv")
-
-```
-
-Figuring out extents of data at met stations. 
-```{r metDataExtent, echo=FALSE, message=FALSE}
-metSiteLength <- precipRaw %>% 
-  group_by(SITECODE) %>% 
-  summarise(
-    timeStart = min(DATE),
-    timeEnd = max(DATE)
-  ) %>% 
-  arrange(timeStart)
-
-metSiteLength
+vpd60minRaw <- read.csv("Data/MS00118_v7.txt")
+rhRaw <- read.csv("Data/MS00102_v9.csv")
 ```
 
 Per Steve Wondzell PRIMET is the station to use for precip, CS2MET is likely a bit too overgrown and may be undercatching. PRIMET also site to use for vpd and temp per Chris Daly.
@@ -90,7 +80,10 @@ metVpd <- vpdRaw %>%
            ) %>% 
   select(DATE,VPD_MEAN_DAY,VPD_MAX_DAY,VPD_MIN_DAY) %>% 
   rename(meanVpd = VPD_MEAN_DAY, maxVpd = VPD_MAX_DAY, minVpd = VPD_MIN_DAY)
-  
+
+metRh <- rhRaw %>% 
+  filter(SITECODE == "PRIMET") %>% 
+  mutate(DATE = as_date(DATE)) 
 
 #Create a list of these data frames and then use reduce to sequentially do a full join
 metList <- list(metPrecip, metTemp, metVpd)
@@ -134,13 +127,26 @@ allData <- full_join(met, allQData, by='DATE') %>%
   select(-c(yr,mn))
 ```
 
+Figuring out extents of data at met stations. 
+```{r metDataExtent, echo=FALSE, message=FALSE}
+metSiteLength <- precipRaw %>% 
+  group_by(SITECODE) %>% 
+  summarise(
+    timeStart = min(DATE),
+    timeEnd = max(DATE)
+  ) %>% 
+  arrange(timeStart)
+
+metSiteLength
+```
+
 Working on gap filling vpd.
 - Largest gaps are:
   - 94-9-9:95-8-17
   - 98-5-24:98-12-12
   - These occur when only one vpd sensor is available
 - There is temp data at primet that could be used for a regression gap filling
-- Still need to check 15min vpd data to see if there's anything there
+- 15 min data doesn't help fill any gaps
 ```{r VPD_Gaps}
 #Data as it's currently filtered
 vpdTS <- vpdRaw %>% 
@@ -218,6 +224,7 @@ ggplot(data = tempTS2, aes(DATE, AIRTEMP_MEAN_DAY)) +
   
 #Re-do temp sensor filtering above so that sensors are taken in order: 
 #6, 5, 4
+#This code is now replicated above in metData chunk
 tempTS3 <- tempRaw %>% 
   filter(SITECODE == "PRIMET") %>% 
   mutate(DATE = as_date(DATE)) %>% 
@@ -250,6 +257,32 @@ ggplot_na_distribution(vpdTS2$VPD_MEAN_DAY, x_axis_labels = vpdTS2$DATE)
 ggplot(data = vpdTS2, aes(DATE, VPD_MEAN_DAY)) +
   geom_point(color = "steelblue", size = 1) +
   facet_wrap(~ PROBE_CODE)
+
+#Checking gaps in 15 min data -- Same gaps appear
+vpd60min <- vpd60minRaw %>% 
+  mutate(DATE_TIME = as_datetime(DATE_TIME)) %>% 
+  filter(SITECODE == "PRIMET")
+
+ggplot_na_distribution(vpd60min$VPD_MEAN, x_axis_labels = vpd60min$DATE_TIME)
+
+#Look at gaps in rh to see if it could be used to calculate
+rhTS <- rhRaw %>% 
+  mutate(DATE = as.Date(DATE)) %>% 
+  filter(SITECODE == "PRIMET")
+
+ggplot_na_distribution(rhTS$RELHUM_MEAN_DAY,x_axis_labels = rhTS$DATE)
+statsNA(rhTS$RELHUM_MEAN_DAY)
+
+ggplot(data = rhTS, aes(x = DATE, y = as.factor(PROBE_CODE))) +
+  geom_point()
+
+#Now checking potential regression between temperature and vpd to help gapfill.
+vpdTemp <- allData %>% 
+  select(DATE, meanTemp, meanVpd) %>% 
+  drop_na()
+
+ggplot(data = vpdTemp) +
+  geom_point(aes(x = meanTemp, y = meanVpd))
 
 ```
 
