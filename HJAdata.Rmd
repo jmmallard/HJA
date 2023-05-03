@@ -95,7 +95,7 @@ rm(metList) #Cleanup environment
 ```
 
 Now lets put some datasets together for multiple watersheds (including WS1)
-- WSs 1,2,3,10
+- WSs 1,2,3,9,10
 - Total Q (in inches), rather than mean, max, min
 - Convert DATE from character to date format
 - Convert inches to mm
@@ -108,7 +108,7 @@ Now lets put some datasets together for multiple watersheds (including WS1)
 ```{r allWSdata}
 #Q data
 allQData <- qRaw %>% 
-  filter(SITECODE %in% c("GSWS01","GSWS02","GSWS03","GSWS10")) %>% 
+  filter(SITECODE %in% c("GSWS01","GSWS02","GSWS03","GSWS09", "GSWS10")) %>% 
   select(DATE,TOTAL_Q_AREA,SITECODE) %>% 
   rename(runoff = TOTAL_Q_AREA) %>% 
   mutate(DATE = mdy(DATE)) %>% 
@@ -117,6 +117,7 @@ allQData <- qRaw %>%
   rename(WS1 = GSWS01,
          WS2 = GSWS02,
          WS3 = GSWS03,
+         WS9 = GSWS09,
          WS10 = GSWS10) %>% 
   mutate(DATE = if_else(year(DATE)>2022,DATE-years(100),DATE)) #ymd function has trouble with 2 digit years
   
