@@ -11,10 +11,11 @@ Calculate a 7-day low flow for all days and the same day every year in WS1,2,3,1
 Should add code to dynamically generate variable names from WS names!
 ```{r WSLowFlowAug}
 WSLowFlowData <- allData %>% 
-  select(DATE, precip, WS1, WS2, WS3, WS10, meanVpd, meanTemp, WY) %>% 
+  select(DATE, precip, WS1, WS2, WS3, WS9, WS10, meanVpd, meanTemp, WY) %>% 
   mutate(WS1Low = rollmean(WS1, 7, fill = NA, na.rm = FALSE, align = "center"),
          WS2Low = rollmean(WS2, 7, fill = NA, na.rm = FALSE, align = "center"),
          WS3Low = rollmean(WS3, 7, fill = NA, na.rm = FALSE, align = "center"),
+         WS9Low = rollmean(WS9, 7, fill = NA, na.rm = FALSE, align = "center"),
          WS10Low = rollmean(WS10, 7, fill = NA, na.rm = FALSE, align = "center"))
 
 #Subsetting and plotting                            
@@ -31,6 +32,7 @@ WSLowFlowAnn <- WSLowFlowData %>%
   summarize(WS1minQAug = WS1Low[yday(DATE) == 242],
             WS2minQAug = WS2Low[yday(DATE) == 242],
             WS3minQAug = WS3Low[yday(DATE) == 242],
+            WS9minQAug = WS9Low[yday(DATE) == 242],
             WS10minQAug = WS10Low[yday(DATE) == 242]) %>% 
   filter(Year > 1979 & Year < 2019)
 
