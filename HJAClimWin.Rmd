@@ -28,7 +28,7 @@ Make a similar climData df as above to plug into analyses
 ```{r KJdata}
 load("Data/EDI_met_daily_daytime_nighttime_stats_20220505.Rdat")
 
-ggplot_na_distribution(metdaytime_final$vpdmean, x_axis_labels = metdaytime_final$date)
+# ggplot_na_distribution(metdaytime_final$vpdmean, x_axis_labels = metdaytime_final$date)
 
 climData <- metdaytime_final %>% 
   select(DATE = date, meanVpd = vpdmean) %>% 
@@ -36,10 +36,10 @@ climData <- metdaytime_final %>%
 
 ```
 
-Execute climwin main function for multiple watersheds
+Execute climwin main function for multiple or single watersheds 
 ```{r ClimaWinDataExec}
-WSvarnames <- c("WS1minQAug","WS2minQAug","WS3minQAug", "WS9minQAug", "WS10minQAug")
-# WSvarnames <- "WS2minQAug"
+# WSvarnames <- c("WS1minQAug","WS2minQAug","WS3minQAug", "WS9minQAug", "WS10minQAug")
+WSvarnames <- "WS2minQAug"
 
 climWinModels <- vector(mode = "list", length = length(WSvarnames)) #preallocate list
 
@@ -48,14 +48,14 @@ for (i in 1:length(WSvarnames)){
     select(Year, txtDate, minQ = WSvarnames[i]) %>% 
     drop_na()
     
-  winOut <- slidingwin(xvar = list(climData$precip),
+  winOut <- slidingwin(xvar = list(climData$meanVpd),
                      cdate = climData$txtDate,
                      bdate = lowFlowTemp$txtDate,
                      baseline = lm(minQ ~ 1, data = lowFlowTemp),
                      cinterval = "day",
                      range = c(365,10),
                      type = "relative",
-                     stat = "sum",
+                     stat = "mean",
                      func = "lin",
                      cmissing = "method2" #This method replaces missing values with mean value of all records with same date
                      )
@@ -82,7 +82,30 @@ for (i in 1:length(WSvarnames)) {
 
 ```
 
+Look at individual model fits. Choose which model to plot based on best models output from slidingwin output and then use singlewin to get the specific model
+```{r plotIndvModels}
+winOpen <- 118
+winClose <- 81
 
+#Get model to plot
+model2plot <- singlewin(xvar = list(climData$meanVpd),
+                     cdate = climData$txtDate,
+                     bdate = lowFlowData$txtDate,
+                     baseline = lm(WS2minQAug ~ 1, data = lowFlowData),
+                     cinterval = "day",
+                     range = c(winOpen, winClose),
+                     type = "relative",
+                     stat = "mean",
+                     func = "lin",
+                     cmissing = "method2" #This method replaces missing values with mean value of all records with same date
+                     )
+  
+plotbest(dataset = climWinModels[[1]], 
+         bestmodel = model2plot$BestModel,
+         bestmodeldata = model2plot$BestModelData)
+
+
+```
 
 
 
