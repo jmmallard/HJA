@@ -139,23 +139,60 @@ for (i in 1:length(WSvarnames)) {
 
 Look at individual model fits. Choose which model to plot based on best models output from slidingwin output and then use singlewin to get the specific model
 ```{r plotIndvModels}
-winOpen <- 118
-winClose <- 81
+winOpen <- 112
+winClose <- 79
+ws <- 1 #Which watershed: 1-5 is WS1, WS2, WS3, WS9, WS10
+climVar <- 2 #1 = precip, 2 = vpd
+
+WSvarnames <- c("WS1minQAug","WS2minQAug","WS3minQAug", "WS9minQAug", "WS10minQAug")
+
+#Select correct climate data
+if (climVar == 1){
+  climDataTemp <- climDataPrecip %>% 
+    select(txtDate, climPredictor = precip)
+} else if (climVar == 2){
+  climDataTemp <- climDataVpd %>% 
+    select(txtDate, climPredictor = meanVpd)
+} else {
+  stop("climVar must be 1 for precip or 2 for vpd")
+}
+
+#Select correct watershed data
+lowFlowDataTemp <- lowFlowData %>% 
+  select(txtDate, minQAug = WSvarnames[ws])
+
+#Select correct method for if it's precip (sum) or vpd (mean)
+if (climVar == 1) {
+  statType <- "sum"
+} else if (climVar == 2) {
+  statType <- "mean" 
+} else {
+  stop("climVar must be 1 for precip or 2 for vpd")
+}
 
 #Get model to plot
-model2plot <- singlewin(xvar = list(climData$meanVpd),
-                     cdate = climData$txtDate,
-                     bdate = lowFlowData$txtDate,
-                     baseline = lm(WS2minQAug ~ 1, data = lowFlowData),
+model2plot <- singlewin(xvar = list(climDataTemp$climPredictor),
+                     cdate = climDataTemp$txtDate,
+                     bdate = lowFlowDataTemp$txtDate,
+                     baseline = lm(minQAug ~ 1, data = lowFlowDataTemp),
                      cinterval = "day",
                      range = c(winOpen, winClose),
                      type = "relative",
-                     stat = "mean",
+                     stat = statType,
                      func = "lin",
                      cmissing = "method2" #This method replaces missing values with mean value of all records with same date
                      )
+
+#Select correct output dataset for climate variable
+if (climVar == 1) {
+  climDataset <- climWinModelsPrecip[[ws]]
+} else if (climVar == 2) {
+  climDataset <- climWinModelsVpd[[ws]]
+} else {
+  stop("climVar must be 1 for precip or 2 for vpd")
+}
   
-plotbest(dataset = climWinModels[[1]], 
+plotbest(dataset = climDataset, 
          bestmodel = model2plot$BestModel,
          bestmodeldata = model2plot$BestModelData)
 
