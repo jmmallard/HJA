@@ -9,13 +9,13 @@ Exploratory analysis using WSXLowFlow data and climate variables with climwin pa
 - extract data for all WS low flow Aug 30
 - slidingwin does not work with NAs in the predictive (climate) data. Replace those values with 0 for now in precip
 ```{r ClimWinData}
-climData <- allData %>% 
+climDataPrecip <- allData %>% 
   select(DATE, precip, meanTemp, meanVpd) %>% 
   mutate(txtDate = format(DATE,"%d/%m/%Y")) %>% #Format data for use with slidingwin function
   # filter(DATE > as.Date("1978-04-01")) #For when PRIMET came online
   filter(DATE > as.Date("1988-07-12")) #For when vpd sensors came online
 
-climData$precip[is.na(climData$precip)] <- 0
+climDataPrecip$precip[is.na(climDataPrecip$precip)] <- 0
 
 lowFlowData <- WSLowFlowAnn %>% 
   select(WS1minQAug, WS2minQAug, WS3minQAug, WS9minQAug, WS10minQAug, Year) %>% 
@@ -24,19 +24,19 @@ lowFlowData <- WSLowFlowAnn %>%
 ```
 
 Checking on data provided by Karla (EDI_met_daily_daytime_nighttime...)
-Make a similar climData df as above to plug into analyses
+Make a climData df as above to plug into analyses for vpd
 ```{r KJdata}
 load("Data/EDI_met_daily_daytime_nighttime_stats_20220505.Rdat")
 
 # ggplot_na_distribution(metdaytime_final$vpdmean, x_axis_labels = metdaytime_final$date)
 
-climData <- metdaytime_final %>% 
+climDataVpd <- metdaytime_final %>% 
   select(DATE = date, meanVpd = vpdmean) %>% 
   mutate(txtDate = format(DATE,"%d/%m/%Y"))
 
 ```
 
-Execute climwin main function for multiple or single watersheds 
+Execute climwin main function for multiple or single watersheds.
 ```{r ClimaWinDataExec}
 # WSvarnames <- c("WS1minQAug","WS2minQAug","WS3minQAug", "WS9minQAug", "WS10minQAug")
 WSvarnames <- "WS2minQAug"
@@ -64,16 +64,71 @@ climWinModels[[i]] <- winOut[[1]]$Dataset
 }
 ```
 
+Modified version of ClimaWinDataExec above to include runs for both precip and vpd and save in a single structure
+```{r ClimaWinDataExec2}
+WSvarnames <- c("WS1minQAug","WS2minQAug","WS3minQAug", "WS9minQAug", "WS10minQAug")
+# WSvarnames <- "WS2minQAug"
+
+#preallocate lists
+climWinModelsPrecip <- vector(mode = "list", length = length(WSvarnames)) 
+climWinModelsVpd <- vector(mode = "list", length = length(WSvarnames)) 
+
+
+for (i in 1:length(WSvarnames)){
+  lowFlowTemp <- lowFlowData %>% #Extract specific WS and remove rows with NA
+    select(Year, txtDate, minQ = WSvarnames[i]) %>% 
+    drop_na()
+  
+  #Precip  
+  winOut <- slidingwin(xvar = list(climDataPrecip$precip),
+                     cdate = climDataPrecip$txtDate,
+                     bdate = lowFlowTemp$txtDate,
+                     baseline = lm(minQ ~ 1, data = lowFlowTemp),
+                     cinterval = "day",
+                     range = c(365,10),
+                     type = "relative",
+                     stat = "sum",
+                     func = "lin",
+                     cmissing = "method2" #This method replaces missing values with mean value of all records with same date
+                     )
+
+  climWinModelsPrecip[[i]] <- winOut[[1]]$Dataset
+  
+  #Vpd
+  winOut <- slidingwin(xvar = list(climData$meanVpd),
+                     cdate = climData$txtDate,
+                     bdate = lowFlowTemp$txtDate,
+                     baseline = lm(minQ ~ 1, data = lowFlowTemp),
+                     cinterval = "day",
+                     range = c(365,10),
+                     type = "relative",
+                     stat = "mean",
+                     func = "lin",
+                     cmissing = "method2" #This method replaces missing values with mean value of all records with same date
+                     )
+
+  climWinModelsVpd[[i]] <- winOut[[1]]$Dataset
+}
+```
+
 Visualize data tables and plots using built in functions. Added loop to plot multiples
 ```{r ClimaWinDataVis}
 for (i in 1:length(WSvarnames)) {
-  plot1 <- plotwin(dataset = climWinModels[[i]]) + ggtitle(paste0("Open/close for 95% set ", WSvarnames[i]))
-  plot2 <- plotdelta(dataset = climWinModels[[i]]) + ggtitle(paste0("Model AICs for ", WSvarnames[i]))
-  plot3 <- plotweights(dataset = climWinModels[[i]])
-  print(plot1)
-  print(plot2)
-  print(plot3)
+  # plot1precip <- plotwin(dataset = climWinModels[[i]]) + ggtitle(paste0("Open/close for 95% set ", WSvarnames[i]))
+  plot2precip <- plotdelta(dataset = climWinModelsPrecip[[i]]) + ggtitle(paste0("Precip model AICs for ", WSvarnames[i]))
+  plot3precip <- plotweights(dataset = climWinModelsPrecip[[i]])
+  # print(plot1precip)
+  print(plot2precip)
+  print(plot3precip)
+  
+  # plot1vpd <- plotwin(dataset = climWinModels[[i]]) + ggtitle(paste0("Open/close for 95% set ", WSvarnames[i]))
+  plot2vpd <- plotdelta(dataset = climWinModelsVpd[[i]]) + ggtitle(paste0("Vpd model AICs for ", WSvarnames[i]))
+  plot3vpd <- plotweights(dataset = climWinModelsVpd[[i]])
+  # print(plot1vpd)
+  print(plot2vpd)
+  print(plot3vpd)
 }
+
 
 # head(climWinModels[[4]])
 # 
