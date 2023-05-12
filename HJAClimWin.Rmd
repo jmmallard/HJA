@@ -18,9 +18,11 @@ climDataPrecip <- allData %>%
 climDataPrecip$precip[is.na(climDataPrecip$precip)] <- 0
 
 lowFlowData <- WSLowFlowAnn %>% 
+  ungroup() %>% 
   select(WS1minQAug, WS2minQAug, WS3minQAug, WS9minQAug, WS10minQAug, Year) %>% 
   mutate(txtDate = paste0("30/08/",Year)) %>% 
-  filter(Year > 1989) #For use with vpd
+  filter(Year > 1989) %>%  #For use with vpd
+  mutate(WS3minQAug = na_mean(WS3minQAug)) #Fill missing WS3 value in 1996 with mean
 ```
 
 Checking on data provided by Karla (EDI_met_daily_daytime_nighttime...)
@@ -139,10 +141,10 @@ for (i in 1:length(WSvarnames)) {
 
 Look at individual model fits. Choose which model to plot based on best models output from slidingwin output and then use singlewin to get the specific model
 ```{r plotIndvModels}
-winOpen <- 112
-winClose <- 79
-ws <- 1 #Which watershed: 1-5 is WS1, WS2, WS3, WS9, WS10
-climVar <- 2 #1 = precip, 2 = vpd
+winOpen <- 113
+winClose <- 94
+ws <- 5 #Which watershed: 1-5 is WS1, WS2, WS3, WS9, WS10
+climVar <- 1 #1 = precip, 2 = vpd
 
 WSvarnames <- c("WS1minQAug","WS2minQAug","WS3minQAug", "WS9minQAug", "WS10minQAug")
 
@@ -198,6 +200,70 @@ plotbest(dataset = climDataset,
 
 
 ```
+
+Filter models to only those greater than a week (?) and look at box plots of top 20 (?) open and close windows. Visualize these results.
+```{r TopModels}
+#inputs
+winLength <- 7 #number of days of minimum window
+numTopModels <- 20 #top number of models as ranked by AIC to plot
+
+#Pre-allocate data frame
+topClimModels <- data.frame(deltaAICc = double(),
+                            WindowOpen = integer(),
+                            WindowClose = integer(),
+                            WSname = character(),
+                            climPred = character())
+
+for (i in 1:3) {
+  #Precip models
+  tempClimModels <- climWinModelsPrecip[[i]] %>% 
+    select(deltaAICc, WindowOpen, WindowClose) %>% 
+    mutate(WSname = str_sub(WSvarnames[i], 1, -8),
+           climPred = "precip") %>% 
+    mutate(lengthWin = WindowOpen - WindowClose + 1) %>% 
+    filter(lengthWin >= winLength) %>% 
+    select(-lengthWin) %>% 
+    slice_min(deltaAICc, n = numTopModels)
+  
+  topClimModels <- rbind(topClimModels,tempClimModels)
+  
+  #Vpd models
+  tempClimModels <- climWinModelsVpd[[i]] %>% 
+    select(deltaAICc, WindowOpen, WindowClose) %>% 
+    mutate(WSname = str_sub(WSvarnames[i], 1, -8),
+           climPred = "vpd") %>% 
+    mutate(lengthWin = WindowOpen - WindowClose + 1) %>% 
+    filter(lengthWin >= winLength) %>% 
+    select(-lengthWin) %>% 
+    slice_min(deltaAICc, n = numTopModels)
+  
+  topClimModels <- rbind(topClimModels,tempClimModels)
+} 
+
+# :length(WSvarnames)
+
+#Plot some boxplots of top models
+boxTopModels <- topClimModels %>% 
+  select(-deltaAICc) %>% 
+  gather(winXO, day, WindowOpen:WindowClose) %>% 
+  ggplot(aes(x = day, y = winXO)) +
+  geom_boxplot() +
+  facet_grid(WSname ~ climPred)
+
+print(boxTopModels)
+# :length(WSvarnames)
+```
+
+
+
+
+
+
+
+
+
+
+
 
 
 
