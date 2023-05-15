@@ -198,14 +198,13 @@ plotbest(dataset = climDataset,
          bestmodel = model2plot$BestModel,
          bestmodeldata = model2plot$BestModelData)
 
-
 ```
 
-Filter models to only those greater than a week (?) and look at box plots of top 20 (?) open and close windows. Visualize these results.
+Filter models to only those greater than some length of time and look at box plots and tile plots of top X open and close windows. Visualize these results with boxplots and tile plots.
 ```{r TopModels}
 #inputs
 winLength <- 7 #number of days of minimum window
-numTopModels <- 20 #top number of models as ranked by AIC to plot
+numTopModels <- 40 #top number of models as ranked by AIC to plot
 
 #Pre-allocate data frame
 topClimModels <- data.frame(deltaAICc = double(),
@@ -275,12 +274,17 @@ for (i in 1:nrow(tileTopModels)) {
 }
 
 tilePlots <- tileTopModels %>% 
-  ggplot(aes(x = winDay, y = WS, fill = nModDay)) +
+  ggplot(aes(x = winDays2Dates(winDay), y = WS, fill = nModDay)) +
   geom_tile() + facet_wrap(~ climVar)
 print(tilePlots)
-# tileTopModels <- topClimModels %>% 
-  
-# :length(WSvarnames)
+
+```
+This function is for converting window open and window close days to dates for plotting purposes
+```{r days2datesBeforeAug30}
+winDays2Dates <- function(d) {
+  doys <- 241 - d #Convert day before Aug 30 to day of year. R starts from day 0 not 1
+  output <- as.Date(doys, origin = "2023-01-01")
+}
 ```
 
 
