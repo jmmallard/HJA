@@ -1,0 +1,34 @@
+---
+title: "ICRW8_figs"
+output: html_notebook
+---
+
+Figures for presentation at 2023 ICRW8 conference
+
+```{r SoilMoisture}
+soilWaterRaw <- read.csv("Data/KJ_WS1_2019_soil_water.csv")
+
+soilWater <- soilWaterRaw %>% 
+  mutate(DT = mdy_hm(datetime)) %>% 
+  mutate(wp_kPa_50cm = ifelse(wp_kPa_50cm < -40, -40, wp_kPa_50cm))
+
+soilWaterPlot1 <- ggplot(data = soilWater, aes(x = DT, y = wp_kPa_50cm, group = site)) +
+  geom_line() +
+  labs(
+       y = "WP, 50 cm (kPa)")
+
+soilWaterPlot2 <- ggplot(data = soilWater, aes(x = DT, y = vwc_50cm, group = site)) +
+  geom_line() +
+  labs(
+       y = "VWC, 50 cm")
+
+soilWaterPlot3 <- ggplot(data = soilWater, aes(x = DT, y = vwc_100cm, group = site)) +
+  geom_line() +
+  labs(
+       y = "VWC, 100 cm")
+
+soilWaterPlot <- grid.arrange(soilWaterPlot1, soilWaterPlot2, soilWaterPlot3, nrow = 3)
+
+print(soilWaterPlot)
+```
+

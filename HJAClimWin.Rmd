@@ -79,7 +79,7 @@ climWinModelsVpd <- vector(mode = "list", length = length(WSvarnames))
 # randWinModelsVpd <- vector(mode = "list", length = length(WSvarnames)) 
 
 
-for (i in 1:2){
+for (i in 1:5){
   lowFlowTemp <- lowFlowData %>% #Extract specific WS and remove rows with NA
     select(Year, txtDate, minQ = WSvarnames[i]) %>% 
     drop_na()
@@ -154,7 +154,7 @@ for (i in 1:2){
 # plothist(climWinModelsPrecip[[wsNum]], randWinModelsPrecip[[wsNum]])
 # plothist(climWinModelsVpd[[wsNum]], randWinModelsVpd[[wsNum]])
 
-save()
+save(climWinModelsPrecip, climWinModelsVpd, file = "climWinOutputs.RDat")
 ```
 
 Visualize data tables and plots using built in functions. Added loop to plot multiples
@@ -186,21 +186,22 @@ for (i in 1:length(WSvarnames)) {
 Look at individual model fits. Choose which model to plot based on best models output from slidingwin output and then use singlewin to get the specific model
 ```{r plotIndvModels}
 winOpen <- 113
-winClose <- 94
-ws <- 5 #Which watershed: 1-5 is WS1, WS2, WS3, WS9, WS10
-climVar <- 1 #1 = precip, 2 = vpd
+winClose <- 81
+ws <- 1 #Which watershed: WS1, WS2, WS3, WS9, WS10
+climVar <- "VPD" #Precip or VPD
 
 WSvarnames <- c("WS1minQAug","WS2minQAug","WS3minQAug", "WS9minQAug", "WS10minQAug")
+WSnames <- str_sub(WSvarnames, 1, -8)
 
 #Select correct climate data
-if (climVar == 1){
+if (climVar == "Precip"){
   climDataTemp <- climDataPrecip %>% 
     select(txtDate, climPredictor = precip)
-} else if (climVar == 2){
+} else if (climVar == "VPD"){
   climDataTemp <- climDataVpd %>% 
     select(txtDate, climPredictor = meanVpd)
 } else {
-  stop("climVar must be 1 for precip or 2 for vpd")
+  stop("climVar must be precip vpd")
 }
 
 #Select correct watershed data
@@ -208,12 +209,12 @@ lowFlowDataTemp <- lowFlowData %>%
   select(txtDate, minQAug = WSvarnames[ws])
 
 #Select correct method for if it's precip (sum) or vpd (mean)
-if (climVar == 1) {
+if (climVar == "Precip") {
   statType <- "sum"
-} else if (climVar == 2) {
+} else if (climVar == "VPD") {
   statType <- "mean" 
 } else {
-  stop("climVar must be 1 for precip or 2 for vpd")
+  stop("climVar must be precip vpd")
 }
 
 #Get model to plot
@@ -230,9 +231,9 @@ model2plot <- singlewin(xvar = list(climDataTemp$climPredictor),
                      )
 
 #Select correct output dataset for climate variable
-if (climVar == 1) {
+if (climVar == "Precip") {
   climDataset <- climWinModelsPrecip[[ws]]
-} else if (climVar == 2) {
+} else if (climVar == "VPD") {
   climDataset <- climWinModelsVpd[[ws]]
 } else {
   stop("climVar must be 1 for precip or 2 for vpd")
@@ -242,6 +243,16 @@ plotbest(dataset = climDataset,
          bestmodel = model2plot$BestModel,
          bestmodeldata = model2plot$BestModelData)
 
+#Manual version of above plot
+modelPlot <- ggplot(data = model2plot$BestModelData, aes(x = climate, y = yvar)) +
+  geom_point() +
+  geom_smooth(method = "lm") +
+  theme_bw() + 
+  stat_cor(aes(label = after_stat(rr.label)), color = "red", geom = "label") +
+  labs(title = paste("Window", climVar, "vs Aug 30 LF for", WSnames[ws]),
+       y = "7 day mean Q (mm/day)",
+       x = "Total precip (mm)")
+print(modelPlot)
 ```
 
 Filter models to only those greater than some length of time and look at box plots and tile plots of top X open and close windows. Visualize these results with boxplots and tile plots.
@@ -319,7 +330,12 @@ for (i in 1:nrow(tileTopModels)) {
 
 tilePlots <- tileTopModels %>% 
   ggplot(aes(x = winDays2Dates(winDay), y = WS, fill = nModDay)) +
-  geom_tile() + facet_wrap(~ climVar)
+  geom_tile() + facet_wrap(~ climVar) +
+  labs(title = paste("Top ", numTopModels, " models explaining Aug 30 low flow"),
+       x = "Open and close days",
+       y = "Watershed",
+       fill = "# of models"
+       )
 print(tilePlots)
 
 ```
