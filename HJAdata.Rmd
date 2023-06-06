@@ -23,6 +23,7 @@ library(climwin)
 library(plotly)
 library(imputeTS)
 library(ggpubr)
+library(ggthemes)
 ```
 
 Input data catalog:
