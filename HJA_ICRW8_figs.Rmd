@@ -66,11 +66,52 @@ hydgrf <- allData %>%
         axis.text = element_text(size = 14))
 
 allHydgrfs <- allData %>% 
-  group_by(WY) %>% 
-  summarize(dayCount = n())
+  filter(WY >= 1988 & WY <= 2019)
   
 
 print(hydgrf)
+
+
+
+#From Garett
+summary.plot.swe = swe_fill %>% 
+  filter(waterYear > "1998" & waterYear < "2019") %>% 
+  group_by(SITECODE, wy.day) %>% 
+  summarise(med.swe=median(SWE_DAY, na.rm=TRUE)) %>%
+  ungroup()
+
+swe_fill %>% 
+  # filter(SITECODE %in% c("CENMET", "PRIMET", "UPLMET")) %>%
+  filter(SITECODE %in% c("CENMET")) %>%
+  filter(waterYear > "1998" & waterYear < "2019") %>% 
+  mutate(snow.amt.cat=as.factor(case_when(
+    waterYear %in% c(1999,2002,2008,2013,2017) ~ "High",
+    waterYear %in% c(2003, 2005, 2010, 2014, 2015) ~ "Low",
+    TRUE ~ "Average"
+  ))) %>% 
+  ggplot() +
+  # geom_line(aes(x=wy.day, y=SWE_DAY, group=waterYear), color="gray") +
+  geom_line(aes(x=wy.day, y=SWE_DAY, group=waterYear, color=snow.amt.cat)) +
+  scale_color_manual(values=c("gray","#0081bd","#9c0505")) +
+  geom_line(data=summary.plot.swe %>% filter(SITECODE %in% c("CENMET")),
+            aes(x=wy.day, y=med.swe), color="black", linewidth=1) +
+  # scale_x_date(expand=c(0,1), date_labels="%b", date_breaks="1 month") +
+  # facet_grid(SITECODE~., scales="free") +
+  scale_x_continuous(expand=c(0,0)) +
+  scale_y_continuous(expand=expansion(mult=c(0,0.05))) +
+  theme_bw() +
+  theme(
+    panel.background=element_rect(color="black"),  # change plot outline color
+    strip.text=element_text(size=14, color="black"),  # facet text
+    strip.background=element_rect(color=NA, fill=NA),  # facet background
+    axis.text=element_text(size=10, color="black"),  # axis labels
+    axis.title=element_text(size=12, color="black"), # axis title
+    legend.text=element_text(size=12, color="black"),  # legend text
+    legend.title=element_text(size=12, color="black"),  # legend title text
+    legend.position="bottom"
+  ) +
+  labs(x="Water Year Day", y="Snow Water Equivalent (mm)", 
+       color="")
 
 ```
 
