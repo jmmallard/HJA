@@ -54,6 +54,8 @@ Fig2
 
 Representative hydrograph and all hydrographs
 ```{r Hydrographs}
+
+#Plot one hydrograph
 hydgrf <- allData %>% 
   filter(DATE > as.Date("2018-09-01") & DATE < as.Date("2019-09-30")) %>% 
   ggplot(aes(x = DATE, y = WS2)) +
@@ -64,14 +66,19 @@ hydgrf <- allData %>%
   theme_few() +
   theme(axis.title = element_blank(),
         axis.text = element_text(size = 14))
-
-allHydgrfs <- allData %>% 
-  filter(WY >= 1988 & WY <= 2019)
-  
-
 print(hydgrf)
 
+#Restructure data to plot all hydrographs over each other
+allHydgrfs <- allData %>% 
+  filter(WY >= 1988 & WY <= 2019) %>% 
+  select(DATE, WS2, WY) %>% 
+  mutate(DATE2 = case_when(
+    month(DATE) %in% c(10,11,12) ~ ymd(format(DATE, "2099-%m-%d")),
+    month(DATE) %in% c(1,2,3,4,5,6,7,8,9) ~ ymd(format(DATE, "2100-%m-%d")))) %>% 
+  ggplot() +
+  geom_line(aes(x = DATE2, y = WS2, group = WY), color = "#d9d9d9")
 
+print(allHydgrfs)
 
 #From Garett
 summary.plot.swe = swe_fill %>% 
