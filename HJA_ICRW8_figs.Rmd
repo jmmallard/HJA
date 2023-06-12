@@ -10,7 +10,8 @@ soilWaterRaw <- read.csv("Data/KJ_WS1_2019_soil_water.csv")
 
 soilWater <- soilWaterRaw %>% 
   mutate(DT = mdy_hm(datetime)) %>% 
-  mutate(wp_kPa_50cm = ifelse(wp_kPa_50cm < -40, -40, wp_kPa_50cm))
+  mutate(wp_kPa_50cm = ifelse(wp_kPa_50cm < -40, -40, wp_kPa_50cm)) %>% 
+  mutate(wpMA = rollmean(wp_kPa_50cm, 10, fill = NA))
 
 soilWaterPlot1 <- ggplot(data = soilWater, aes(x = DT, y = wp_kPa_50cm, group = site)) +
   geom_line() +
@@ -30,6 +31,14 @@ soilWaterPlot3 <- ggplot(data = soilWater, aes(x = DT, y = vwc_100cm, group = si
 soilWaterPlot <- grid.arrange(soilWaterPlot1, soilWaterPlot2, soilWaterPlot3, nrow = 3)
 
 print(soilWaterPlot)
+
+soilWaterPotential <- ggplot(data = soilWater[!is.na(soilWater$wpMA),],
+                             aes(x = DT, y = wpMA, group = site)) +
+  geom_line(size = 0.7) +
+  scale_y_continuous(limits = c(-39,-7), expand = c(0,0)) +
+  labs(x = "", y = "WP, 50 cm (kPa)") +
+  theme_bw()
+print(soilWaterPotential)
 ```
 
 Sites where low flow studies have been done
