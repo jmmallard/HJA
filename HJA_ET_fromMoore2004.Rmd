@@ -6,7 +6,41 @@ output: html_notebook
 Attempts to leverage data from Moore et al 2004 study on transpiration at HJA WS1 and 2
 
 Load data from digitized csvs
-```{r}
+```{r Data}
+Figure3aData <- read.csv("Data/Moore2004Data/Figure3a.csv")
+Figure3bData <- read.csv("Data/Moore2004Data/Figure3b.csv")
+Figure7Data <- read.csv("Data/Moore2004Data/Figure7.csv")
+```
+
+Restructure data:
+- Make three df (sap flux 1999 and 2000 and transpiration)
+- Lots of fiddling to get day of year into the right date
+- Aggregate into daily values
+- Linear interpolation of missing values
+
+```{r structureData}
+sapFlux1999 <- Figure3bData %>% 
+  rename(sFlux = SapFluxDens) %>% 
+  mutate(daysInYear = ifelse(leap_year(year), 366, 365)) %>% 
+  mutate(decimalDate = year + DOY/daysInYear) %>% 
+  mutate(dateTime = date_decimal(decimalDate)) %>% 
+  mutate(DATE = as.Date(dateTime)) %>% 
+  group_by(DATE, tree) %>% 
+  summarise(sFluxDaily = mean(sFlux)) %>% 
+  ungroup() %>% 
+  spread(tree,sFluxDaily) %>% 
+  padr::pad(interval = "day") %>% 
+  mutate(PSMEy = na.approx(PSMEy),
+         ALRUy = na.approx(ALRUy))
+
+# sapFlux2000 <- 
+#   
+# trans2000 <- 
+
+sap1999Plot <- sapFlux1999 %>% 
+  ggplot(aes(x = DATE, y = sFluxDaily, group = tree)) +
+  geom_point()
+print(sap1999Plot)
 
 ```
 
