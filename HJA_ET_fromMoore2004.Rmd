@@ -1,0 +1,12 @@
+---
+title: "HJA_ET_fromMoore2004"
+output: html_notebook
+---
+
+Attempts to leverage data from Moore et al 2004 study on transpiration at HJA WS1 and 2
+
+Load data from digitized csvs
+```{r}
+
+```
+

@@ -343,7 +343,7 @@ WS2WinPlot <- tileTopModels %>%
   filter(WS == "WS2") %>% 
   mutate(winDate = winDays2Dates(winDay)) %>% 
   ggplot(aes(x = winDate, y = nModDay, fill = nModDay)) +
-  geom_bar(stat = "identity") +
+  geom_col(width = 1) +
   facet_wrap(~ climVar) +
   scale_y_continuous(expand = c(0,0))
 
