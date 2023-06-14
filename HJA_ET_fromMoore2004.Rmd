@@ -31,16 +31,54 @@ sapFlux1999 <- Figure3bData %>%
   spread(tree,sFluxDaily) %>% 
   padr::pad(interval = "day") %>% 
   mutate(PSMEy = na.approx(PSMEy),
-         ALRUy = na.approx(ALRUy))
+         ALRUy = na.approx(ALRUy)) %>% 
+  gather(tree, sFlux, PSMEy, ALRUy)
+  
 
-# sapFlux2000 <- 
-#   
-# trans2000 <- 
+sapFlux2000 <- Figure3aData %>% 
+  rename(sFlux = SapFluxDens) %>% 
+  mutate(daysInYear = ifelse(leap_year(year), 366, 365)) %>% 
+  mutate(decimalDate = year + DOY/daysInYear) %>% 
+  mutate(dateTime = date_decimal(decimalDate)) %>% 
+  mutate(DATE = as.Date(dateTime)) %>% 
+  group_by(DATE, tree) %>% 
+  summarise(sFluxDaily = mean(sFlux)) %>% 
+  ungroup() %>% 
+  spread(tree,sFluxDaily) %>% 
+  padr::pad(interval = "day") %>% 
+  mutate(PSMEy = na.approx(PSMEy),
+         PSMEo = na.approx(PSMEo)) %>% 
+  gather(tree, sFlux, PSMEy, PSMEo)
+  
+trans2000 <- Figure7Data %>% 
+  mutate(daysInYear = ifelse(leap_year(year), 366, 365)) %>% 
+  mutate(decimalDate = year + DOY/daysInYear) %>% 
+  mutate(dateTime = date_decimal(decimalDate)) %>% 
+  mutate(DATE = as.Date(dateTime)) %>% 
+  group_by(DATE, tree) %>% 
+  summarise(transDaily = mean(trans)) %>% 
+  ungroup() %>% 
+  spread(tree,transDaily) %>% 
+  padr::pad(interval = "day") %>% 
+  mutate(PSMEy = na.approx(PSMEy),
+         PSMEo = na.approx(PSMEo)) %>% 
+  gather(tree, trans, PSMEy, PSMEo)
 
-sap1999Plot <- sapFlux1999 %>% 
-  ggplot(aes(x = DATE, y = sFluxDaily, group = tree)) +
-  geom_point()
-print(sap1999Plot)
+#Plot these dfs to check how they match with Moore 2004
+Figure3aMoore <- sapFlux2000 %>% 
+  ggplot(aes(x = DATE, y = sFlux)) +
+  geom_line(aes(color = tree))
+print(Figure3aMoore)
+
+Figure3bMoore <- sapFlux1999 %>%
+  ggplot(aes(x = DATE, y = sFlux)) +
+  geom_line(aes(color = tree))
+print(Figure3bMoore)
+
+Figure7Moore <- trans2000 %>% 
+  ggplot(aes(x = DATE, y = trans)) +
+  geom_line(aes(color = tree))
+print(Figure7Moore)
 
 ```
 
