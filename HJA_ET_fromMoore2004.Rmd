@@ -71,7 +71,7 @@ Figure3aMoore <- sapFlux2000 %>%
 print(Figure3aMoore)
 
 Figure3bMoore <- sapFlux1999 %>%
-  ggplot(aes(x = DATE, y = sFlux)) +
+ggplot(aes(x = DATE, y = sFlux)) +
   geom_line(aes(color = tree))
 print(Figure3bMoore)
 
@@ -81,4 +81,85 @@ Figure7Moore <- trans2000 %>%
 print(Figure7Moore)
 
 ```
+
+Now get vpd and radiation data for these same time periods but also as early as march or so to back extrapolate
+```{r metData4Trans}
+vpdMoore <- allData %>% 
+  filter(between(DATE, as.Date("1999-03-01"), as.Date("2000-11-01"))) %>% 
+  select(DATE,meanVpd) %>% 
+  ggplot(aes(x = DATE, y = meanVpd)) + geom_line()
+
+ggplotly(vpdMoore)
+
+#Missing data from 2000-6-4 - 2000-6-21 and 2000-5-24 - 2000-5-31. Check if there are other data in this range at primet
+vpdCheck <- vpdRaw %>% 
+  mutate(DATE = ymd(DATE)) %>% 
+  select(DATE,VPD_MEAN_DAY,SITECODE,HEIGHT,PROBE_CODE) %>% 
+  filter(between(DATE, as.Date("2000-05-23"), as.Date("2000-06-01")) |
+         between(DATE, as.Date("2000-06-03"), as.Date("2000-06-22"))) %>% 
+  filter(!is.na(VPD_MEAN_DAY)) %>% 
+  filter(SITECODE %in% c("PRIMET", "CS2MET"))
+
+#Find radiation data for this period
+radRaw <- read.csv("Data/MS00105_v6.csv")
+
+metRad <- radRaw %>% 
+  mutate(DATE = ymd(DATE)) %>% 
+  select(DATE, SOLAR_TOT_DAY, SITECODE, HEIGHT, PROBE_CODE) %>% 
+  filter(between(DATE, as.Date("1999-03-01"), as.Date("2000-11-01"))) %>% 
+  filter(SITECODE == "PRIMET")
+
+radPlot <- metRad %>% 
+  ggplot(aes(x = DATE, y = SOLAR_TOT_DAY)) + geom_line()
+
+ggplotly(radPlot)
+#Data gap at 2000-5-24 - 2000-5-31
+```
+
+Check to see what other sensors and stations could be suitable for linear regression interpolation.
+  Requires radRaw loaded in previous chunk from MS00105_v6.csv
+```{r gapFillingVpdRad}
+fromToDates <- c("1999-03-01", "2000-11-01")
+
+#Vpd data from all sites, sensors, heights
+vpdCheck <- vpdRaw %>% 
+  mutate(DATE = ymd(DATE)) %>% 
+  select(DATE,VPD_MEAN_DAY,SITECODE,HEIGHT,PROBE_CODE) %>% 
+  filter(between(DATE, as.Date(fromToDates[1]), as.Date(fromToDates[2])))
+
+
+#Radiation data from all sites, sensors, heights
+radCheck <- radRaw %>% 
+  mutate(DATE = ymd(DATE)) %>% 
+  select(DATE,SOLAR_TOT_DAY,SITECODE,HEIGHT,PROBE_CODE) %>% 
+  filter(between(DATE, as.Date(fromToDates[1]), as.Date(fromToDates[2])))
+
+#Get unique combos of site and height and test relationships between each of these and primet data (probe 04, not 05) 
+varCheck <- vpdCheck
+
+uniqueCombos <- unique(varCheck[ , c("SITECODE","HEIGHT")]) %>% 
+  filter(SITECODE != "PRIMET")
+
+for (i in 1) { #:nrow(uniqueCombos)
+  varPRI <- varCheck %>% 
+    filter(SITECODE == "PRIMET") %>% 
+    filter(PROBE_CODE == "VPDPRI04")
+  varOther <- varCheck %>% 
+    filter(SITECODE == uniqueCombos$SITECODE[i]) %>% 
+    filter(HEIGHT == uniqueCombos$HEIGHT[i])
+  
+  #Test to see if this combination has the data needed. Or print how many points it has
+}
+```
+
+
+
+
+
+
+
+
+
+
+
 
