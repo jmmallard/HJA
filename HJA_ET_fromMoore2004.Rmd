@@ -119,7 +119,7 @@ ggplotly(radPlot)
 Check to see what other sensors and stations could be suitable for linear regression interpolation.
   Requires radRaw loaded in previous chunk from MS00105_v6.csv.
   First select a data range and create vpd and rad dfs
-```{r gapFillingVpdRad}
+```{r gapFillingVpdRad1}
 fromToDates <- c("1999-03-01", "2000-11-01")
 
 #Vpd data from all sites, sensors, heights
@@ -137,7 +137,7 @@ radCheck <- radRaw %>%
 
   Then get unique combos of site and height and test relationships between each of these and primet data (probe 04, not 05) 
 ```{r gapFillingVpdRad2}
-varCheck <- radCheck
+varCheck <- vpdCheck
 datesGap <- c("2000-05-25", "2000-05-30", "2000-06-05", "2000-06-20") #gaps for VPD
 # datesGap <- c("2000-05-25", "2000-05-30") #gaps for radiation
 
@@ -173,6 +173,36 @@ for (i in 1:nrow(uniqueCombos)) { #:nrow(uniqueCombos)
     labs(title = paste(uniqueCombos$SITECODE[i], uniqueCombos$HEIGHT[i], "cm"))
   print(tempPlot)
 }
+```
+
+Finally use the best models to fill gaps in PRIMET data and save as a single data frame
+  Best Models:
+  - VPD: CS2MET, 150 cm
+  - Radiation: CENMET, 625 cm
+  Requires vpdCheck and radCheck from two chunks up
+```{r gapFillingVpdRad3}
+#Put PRIMET radiation, vpd in same df as predictor variables
+PRIgfVpd <- vpdCheck %>% 
+  filter(SITECODE %in% c("PRIMET", "CS2MET")) %>% 
+  filter(PROBE_CODE != "VPDPRI05") %>% 
+  select(DATE, VPD_MEAN_DAY, SITECODE) %>% 
+  spread(SITECODE, VPD_MEAN_DAY) 
+
+#Find lm, add prediction column, replace NAs in PRIMET with prediction
+vpdReg <- lm(PRIMET ~ CS2MET, data = PRIgfVpd)
+
+PRIgfVpd <- PRIgfVpd %>% 
+  add_predictions(vpdReg) %>% 
+  mutate(PRIMET = ifelse(is.na(PRIMET), pred, PRIMET))
+
+#Plot data highlighting gap-fill
+vpdGfPlot <- vpdCheck %>% 
+  filter(SITECODE == "CS2MET") %>% 
+  filter(HEIGHT == 150) %>% 
+  ggplot(aes(x = DATE, y = VPD_MEAN_DAY)) + geom_line()
+print(vpdGfPlot)
+
+#Combine gap-filled vpd and radiation data into single df
 ```
 
 
