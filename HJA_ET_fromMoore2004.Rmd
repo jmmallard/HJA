@@ -117,7 +117,8 @@ ggplotly(radPlot)
 ```
 
 Check to see what other sensors and stations could be suitable for linear regression interpolation.
-  Requires radRaw loaded in previous chunk from MS00105_v6.csv
+  Requires radRaw loaded in previous chunk from MS00105_v6.csv.
+  First select a data range and create vpd and rad dfs
 ```{r gapFillingVpdRad}
 fromToDates <- c("1999-03-01", "2000-11-01")
 
@@ -127,28 +128,50 @@ vpdCheck <- vpdRaw %>%
   select(DATE,VPD_MEAN_DAY,SITECODE,HEIGHT,PROBE_CODE) %>% 
   filter(between(DATE, as.Date(fromToDates[1]), as.Date(fromToDates[2])))
 
-
 #Radiation data from all sites, sensors, heights
 radCheck <- radRaw %>% 
   mutate(DATE = ymd(DATE)) %>% 
   select(DATE,SOLAR_TOT_DAY,SITECODE,HEIGHT,PROBE_CODE) %>% 
   filter(between(DATE, as.Date(fromToDates[1]), as.Date(fromToDates[2])))
+```
 
-#Get unique combos of site and height and test relationships between each of these and primet data (probe 04, not 05) 
-varCheck <- vpdCheck
+  Then get unique combos of site and height and test relationships between each of these and primet data (probe 04, not 05) 
+```{r gapFillingVpdRad2}
+varCheck <- radCheck
+datesGap <- c("2000-05-25", "2000-05-30", "2000-06-05", "2000-06-20") #gaps for VPD
+# datesGap <- c("2000-05-25", "2000-05-30") #gaps for radiation
 
 uniqueCombos <- unique(varCheck[ , c("SITECODE","HEIGHT")]) %>% 
-  filter(SITECODE != "PRIMET")
+  filter(SITECODE != "PRIMET") %>% 
+  mutate(numNAs = 0)
 
-for (i in 1) { #:nrow(uniqueCombos)
+for (i in 1:nrow(uniqueCombos)) { #:nrow(uniqueCombos)
   varPRI <- varCheck %>% 
     filter(SITECODE == "PRIMET") %>% 
-    filter(PROBE_CODE == "VPDPRI04")
+    filter(PROBE_CODE == "VPDPRI04" |
+             PROBE_CODE == "RADPRI01")
   varOther <- varCheck %>% 
     filter(SITECODE == uniqueCombos$SITECODE[i]) %>% 
     filter(HEIGHT == uniqueCombos$HEIGHT[i])
   
-  #Test to see if this combination has the data needed. Or print how many points it has
+  #Check how many NAs are in potential predictor data
+  varOtherCheck <- varOther %>% 
+    filter(between(DATE, as.Date(datesGap[1]), as.Date(datesGap[2])) |
+           between(DATE, as.Date(datesGap[3]), as.Date(datesGap[4])))
+  
+  uniqueCombos$numNAs[i] <- sum(is.na(varOtherCheck$VPD_MEAN_DAY))
+  if(uniqueCombos$numNAs[i] != 0) next
+  
+  #Plot bivariate of predictor and PRIMET data
+  tempPlot <- left_join(varPRI, varOther, by = "DATE") %>% 
+    select(DATE, 2, 6) %>% 
+    rename(PRIvar = 2, OtherVar = 3) %>% 
+    drop_na() %>% 
+    ggplot(aes(x = OtherVar, y = PRIvar)) + geom_point() +
+    geom_smooth(formula = y ~ x, method = "lm") +
+    stat_cor(aes(label = after_stat(rr.label)), color = "red", geom = "label") +
+    labs(title = paste(uniqueCombos$SITECODE[i], uniqueCombos$HEIGHT[i], "cm"))
+  print(tempPlot)
 }
 ```
 

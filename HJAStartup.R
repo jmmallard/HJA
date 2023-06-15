@@ -9,6 +9,7 @@ library(plotly)
 library(imputeTS)
 library(ggpubr)
 library(ggthemes)
+library(modelr)
 
 #Load working data
 load("WorkingData.Rdata")
