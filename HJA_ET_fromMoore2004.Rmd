@@ -188,21 +188,67 @@ PRIgfVpd <- vpdCheck %>%
   select(DATE, VPD_MEAN_DAY, SITECODE) %>% 
   spread(SITECODE, VPD_MEAN_DAY) 
 
+PRIgfRad <- radCheck %>% 
+  filter(SITECODE %in% c("PRIMET", "CENMET")) %>% 
+  select(DATE, SOLAR_TOT_DAY, SITECODE) %>% 
+  spread(SITECODE, SOLAR_TOT_DAY) 
+
 #Find lm, add prediction column, replace NAs in PRIMET with prediction
 vpdReg <- lm(PRIMET ~ CS2MET, data = PRIgfVpd)
 
 PRIgfVpd <- PRIgfVpd %>% 
   add_predictions(vpdReg) %>% 
-  mutate(PRIMET = ifelse(is.na(PRIMET), pred, PRIMET))
+  mutate(gf = ifelse(is.na(PRIMET), 1, 0)) %>% 
+  mutate(PRIMET = ifelse(is.na(PRIMET), pred, PRIMET)) %>% 
+  select(DATE, PRIMET, gf) %>% 
+  mutate(PRIMET = na.approx(PRIMET))
+
+radReg <- lm(PRIMET ~ CENMET, data = PRIgfRad)
+
+PRIgfRad <- PRIgfRad %>% 
+  add_predictions(radReg) %>% 
+  mutate(gf = ifelse(is.na(PRIMET), 1, 0)) %>% 
+  mutate(PRIMET = ifelse(is.na(PRIMET), pred, PRIMET)) %>% 
+  select(DATE, PRIMET, gf) %>% 
+  mutate(PRIMET = na.approx(PRIMET))
 
 #Plot data highlighting gap-fill
-vpdGfPlot <- vpdCheck %>% 
-  filter(SITECODE == "CS2MET") %>% 
-  filter(HEIGHT == 150) %>% 
-  ggplot(aes(x = DATE, y = VPD_MEAN_DAY)) + geom_line()
+vpdGfPlot <- PRIgfVpd %>% 
+  ggplot(aes(x = DATE, y = PRIMET)) + geom_line(aes(color = gf))
 print(vpdGfPlot)
+  
+radGfPlot <- PRIgfRad %>% 
+  ggplot(aes(x = DATE, y = PRIMET)) + geom_line(aes(color = gf))
+print(radGfPlot)
 
 #Combine gap-filled vpd and radiation data into single df
+gfPRI <- left_join(PRIgfRad, PRIgfVpd, by = "DATE") %>% 
+  select(DATE, Rad = PRIMET.x, Vpd = PRIMET.y)
+```
+
+Now, use the gap filled vpd and radiation data to explore extrapolating transpiration data reported in Moore et al.
+  Using:
+  - trans2000
+  - sapFlux1999
+  - sapFlux2000
+  - gfPRI
+```{r ExtrapolateTransAndSapFlux}
+transEx <- left_join(gfPRI, trans2000, by = "DATE")
+
+#SPREAD BY TREE SPECIES
+
+#Plot bivariates of transpiration against radiation and against vpd
+transRadPlot <- transEx %>% 
+  select(DATE, trans, Rad) %>% 
+  drop_na() %>% 
+  ggplot(aes(x = Rad, y = trans)) + geom_point()
+print(transRadPlot)
+
+transVpdPlot <- transEx %>% 
+  select(DATE, trans, Vpd) %>% 
+  drop_na() %>% 
+  ggplot(aes(x = Vpd, y = trans)) + geom_point()
+print(transVpdPlot)
 ```
 
 
