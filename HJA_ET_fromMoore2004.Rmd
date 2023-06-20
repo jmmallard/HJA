@@ -32,8 +32,8 @@ sapFlux1999 <- Figure3bData %>%
   padr::pad(interval = "day") %>% 
   mutate(PSMEy = na.approx(PSMEy),
          ALRUy = na.approx(ALRUy)) %>% 
-  gather(tree, sFlux, PSMEy, ALRUy)
-  
+  gather(tree, sFlux, PSMEy, ALRUy) %>% 
+  filter(!between(DATE, as.Date("1999-07-29"), as.Date("1999-08-04"))) #Data gap in figure 3b. Interpolated later
 
 sapFlux2000 <- Figure3aData %>% 
   rename(sFlux = SapFluxDens) %>% 
@@ -72,7 +72,7 @@ print(Figure3aMoore)
 
 Figure3bMoore <- sapFlux1999 %>%
 ggplot(aes(x = DATE, y = sFlux)) +
-  geom_line(aes(color = tree))
+  geom_point(aes(color = tree))
 print(Figure3bMoore)
 
 Figure7Moore <- trans2000 %>% 
@@ -233,22 +233,70 @@ Now, use the gap filled vpd and radiation data to explore extrapolating transpir
   - sapFlux2000
   - gfPRI
 ```{r ExtrapolateTransAndSapFlux}
-transEx <- left_join(gfPRI, trans2000, by = "DATE")
-
-#SPREAD BY TREE SPECIES
+transEx <- trans2000 %>% 
+  spread(tree, trans) %>% 
+  right_join(., gfPRI, by = "DATE")
 
 #Plot bivariates of transpiration against radiation and against vpd
-transRadPlot <- transEx %>% 
-  select(DATE, trans, Rad) %>% 
-  drop_na() %>% 
-  ggplot(aes(x = Rad, y = trans)) + geom_point()
-print(transRadPlot)
+# transRadPlot <- transEx %>%
+#   select(DATE, PSMEo, PSMEy, Rad) %>%
+#   drop_na() %>%
+#   ggplot() +
+#   geom_point(aes(x = Rad, y = PSMEo, color = "PSMEo")) +
+#   geom_point(aes(x = Rad, y = PSMEy, color = "PSMEy")) +
+#   labs(y = "Trans")
+# print(transRadPlot)
+# 
+# transVpdPlot <- transEx %>%
+#   select(DATE, PSMEo, PSMEy, Vpd) %>%
+#   drop_na() %>%
+#   ggplot() +
+#   geom_point(aes(x = Vpd, y = PSMEo, color = "PSMEo")) +
+#   geom_point(aes(x = Vpd, y = PSMEy, color = "PSMEy")) +
+#   trans(y = "Trans")
+# print(transVpdPlot)
 
-transVpdPlot <- transEx %>% 
-  select(DATE, trans, Vpd) %>% 
-  drop_na() %>% 
-  ggplot(aes(x = Vpd, y = trans)) + geom_point()
-print(transVpdPlot)
+# Generate a bunch of regression models. 
+# RegTransPSMEoVpd <- lm(PSMEo ~ Vpd, data = transEx)
+# RegTransPSMEoRad <- lm(PSMEo ~ Rad, data = transEx)
+# RegTransPSMEoVpdRad <- lm(PSMEo ~ Rad + Vpd, data = transEx)
+# RegTransPSMEyVpd <- lm(PSMEy ~ Vpd, data = transEx)
+# RegTransPSMEyRad <- lm(PSMEy ~ Rad, data = transEx)
+# RegTransPSMEyVpdRad <- lm(PSMEy ~ Rad + Vpd, data = transEx)
+# 
+# summary(RegTransPSMEoVpd)
+# summary(RegTransPSMEoRad)
+# summary(RegTransPSMEoVpdRad)
+# summary(RegTransPSMEyVpd)
+# summary(RegTransPSMEyRad)
+# summary(RegTransPSMEyVpdRad)
+# Rad is best predictor by a little. MLM not much of an improvement over just Rad
+
+#Use Radiation to back predict data through April 1
+transExPred <- transEx %>% 
+  add_predictions(model = RegTransPSMEoRad, var = "PSMEoPred") %>% 
+  add_predictions(model = RegTransPSMEyRad, var = "PSMEyPred") %>% 
+  mutate(Extrap = ifelse(is.na(PSMEo),1,0)) %>% 
+  mutate(PSMEo = ifelse(is.na(PSMEo), PSMEoPred, PSMEo)) %>% 
+  mutate(PSMEy = ifelse(is.na(PSMEy), PSMEyPred, PSMEy)) 
+
+transPredPSMEyPlot <- transExPred %>%  
+  filter(between(DATE, as.Date("2000-04-01"), as.Date("2000-10-31"))) %>% 
+  ggplot() +
+  geom_line(aes(x = DATE, y = PSMEy, color = Extrap))
+print(transPredPSMEyPlot)
+
+transPredPSMEoPlot <- transExPred %>%  
+  filter(between(DATE, as.Date("2000-04-01"), as.Date("2000-10-31"))) %>% 
+  ggplot() +
+  geom_line(aes(x = DATE, y = PSMEo, color = Extrap))
+print(transPredPSMEoPlot)
+
+radPlot <- transExPred %>% 
+  filter(between(DATE, as.Date("2000-04-01"), as.Date("2000-10-31"))) %>% 
+  ggplot() +
+  geom_line(aes(x = DATE, y = Rad))
+print(radPlot)
 ```
 
 
