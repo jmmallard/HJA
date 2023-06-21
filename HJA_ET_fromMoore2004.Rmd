@@ -55,30 +55,30 @@ trans2000 <- Figure7Data %>%
   mutate(decimalDate = year + DOY/daysInYear) %>% 
   mutate(dateTime = date_decimal(decimalDate)) %>% 
   mutate(DATE = as.Date(dateTime)) %>% 
-  group_by(DATE, tree) %>% 
+  group_by(DATE, stand) %>% 
   summarise(transDaily = mean(trans)) %>% 
   ungroup() %>% 
-  spread(tree,transDaily) %>% 
+  spread(stand,transDaily) %>% 
   padr::pad(interval = "day") %>% 
-  mutate(PSMEy = na.approx(PSMEy),
-         PSMEo = na.approx(PSMEo)) %>% 
-  gather(tree, trans, PSMEy, PSMEo)
+  mutate(young = na.approx(young),
+         old = na.approx(old)) %>% 
+  gather(stand, trans, young, old)
 
 #Plot these dfs to check how they match with Moore 2004
 Figure3aMoore <- sapFlux2000 %>% 
   ggplot(aes(x = DATE, y = sFlux)) +
   geom_line(aes(color = tree))
-print(Figure3aMoore)
+ggplotly(Figure3aMoore)
 
 Figure3bMoore <- sapFlux1999 %>%
 ggplot(aes(x = DATE, y = sFlux)) +
-  geom_point(aes(color = tree))
-print(Figure3bMoore)
+  geom_line(aes(color = tree))
+ggplotly(Figure3bMoore)
 
 Figure7Moore <- trans2000 %>% 
   ggplot(aes(x = DATE, y = trans)) +
-  geom_line(aes(color = tree))
-print(Figure7Moore)
+  geom_line(aes(color = stand))
+ggplotly(Figure7Moore)
 
 ```
 
@@ -232,65 +232,65 @@ Now, use the gap filled vpd and radiation data to explore extrapolating transpir
   - sapFlux1999
   - sapFlux2000
   - gfPRI
-```{r ExtrapolateTransAndSapFlux}
+```{r ExtrapolateTrans}
 transEx <- trans2000 %>% 
-  spread(tree, trans) %>% 
+  spread(stand, trans) %>% 
   right_join(., gfPRI, by = "DATE")
 
 #Plot bivariates of transpiration against radiation and against vpd
 # transRadPlot <- transEx %>%
-#   select(DATE, PSMEo, PSMEy, Rad) %>%
+#   select(DATE, old, young, Rad) %>%
 #   drop_na() %>%
 #   ggplot() +
-#   geom_point(aes(x = Rad, y = PSMEo, color = "PSMEo")) +
-#   geom_point(aes(x = Rad, y = PSMEy, color = "PSMEy")) +
+#   geom_point(aes(x = Rad, y = old, color = "old")) +
+#   geom_point(aes(x = Rad, y = young, color = "young")) +
 #   labs(y = "Trans")
 # print(transRadPlot)
 # 
 # transVpdPlot <- transEx %>%
-#   select(DATE, PSMEo, PSMEy, Vpd) %>%
+#   select(DATE, old, young, Vpd) %>%
 #   drop_na() %>%
 #   ggplot() +
-#   geom_point(aes(x = Vpd, y = PSMEo, color = "PSMEo")) +
-#   geom_point(aes(x = Vpd, y = PSMEy, color = "PSMEy")) +
-#   trans(y = "Trans")
+#   geom_point(aes(x = Vpd, y = old, color = "old")) +
+#   geom_point(aes(x = Vpd, y = young, color = "young")) +
+#   labs(y = "Trans")
 # print(transVpdPlot)
 
 # Generate a bunch of regression models. 
-# RegTransPSMEoVpd <- lm(PSMEo ~ Vpd, data = transEx)
-# RegTransPSMEoRad <- lm(PSMEo ~ Rad, data = transEx)
-# RegTransPSMEoVpdRad <- lm(PSMEo ~ Rad + Vpd, data = transEx)
-# RegTransPSMEyVpd <- lm(PSMEy ~ Vpd, data = transEx)
-# RegTransPSMEyRad <- lm(PSMEy ~ Rad, data = transEx)
-# RegTransPSMEyVpdRad <- lm(PSMEy ~ Rad + Vpd, data = transEx)
-# 
-# summary(RegTransPSMEoVpd)
-# summary(RegTransPSMEoRad)
-# summary(RegTransPSMEoVpdRad)
-# summary(RegTransPSMEyVpd)
-# summary(RegTransPSMEyRad)
-# summary(RegTransPSMEyVpdRad)
+RegTransOldVpd <- lm(old ~ Vpd, data = transEx)
+RegTransOldRad <- lm(old ~ Rad, data = transEx)
+RegTransOldVpdRad <- lm(old ~ Rad + Vpd, data = transEx)
+RegTransYoungVpd <- lm(young ~ Vpd, data = transEx)
+RegTransYoungRad <- lm(young ~ Rad, data = transEx)
+RegTransYoungVpdRad <- lm(young ~ Rad + Vpd, data = transEx)
+
+summary(RegTransOldVpd)
+summary(RegTransOldRad)
+summary(RegTransOldVpdRad)
+summary(RegTransYoungVpd)
+summary(RegTransYoungRad)
+summary(RegTransYoungVpdRad)
 # Rad is best predictor by a little. MLM not much of an improvement over just Rad
 
 #Use Radiation to back predict data through April 1
 transExPred <- transEx %>% 
-  add_predictions(model = RegTransPSMEoRad, var = "PSMEoPred") %>% 
-  add_predictions(model = RegTransPSMEyRad, var = "PSMEyPred") %>% 
-  mutate(Extrap = ifelse(is.na(PSMEo),1,0)) %>% 
-  mutate(PSMEo = ifelse(is.na(PSMEo), PSMEoPred, PSMEo)) %>% 
-  mutate(PSMEy = ifelse(is.na(PSMEy), PSMEyPred, PSMEy)) 
+  add_predictions(model = RegTransOldRad, var = "oldPred") %>% 
+  add_predictions(model = RegTransYoungVpd, var = "youngPred") %>% 
+  mutate(Extrap = ifelse(is.na(old),1,0)) %>% 
+  mutate(old = ifelse(is.na(old), oldPred, old)) %>% 
+  mutate(young = ifelse(is.na(young), youngPred, young)) 
 
-transPredPSMEyPlot <- transExPred %>%  
+transPredYoungPlot <- transExPred %>%  
   filter(between(DATE, as.Date("2000-04-01"), as.Date("2000-10-31"))) %>% 
   ggplot() +
-  geom_line(aes(x = DATE, y = PSMEy, color = Extrap))
-print(transPredPSMEyPlot)
+  geom_line(aes(x = DATE, y = young, color = Extrap))
+print(transPredYoungPlot)
 
-transPredPSMEoPlot <- transExPred %>%  
+transPredOldPlot <- transExPred %>%  
   filter(between(DATE, as.Date("2000-04-01"), as.Date("2000-10-31"))) %>% 
   ggplot() +
-  geom_line(aes(x = DATE, y = PSMEo, color = Extrap))
-print(transPredPSMEoPlot)
+  geom_line(aes(x = DATE, y = old, color = Extrap))
+print(transPredOldPlot)
 
 radPlot <- transExPred %>% 
   filter(between(DATE, as.Date("2000-04-01"), as.Date("2000-10-31"))) %>% 
@@ -299,6 +299,10 @@ radPlot <- transExPred %>%
 print(radPlot)
 ```
 
+What about sap flux measurements? Figure 3a is same data as figure 7 but we don't have trans data from Figure 3b
+```{r SapFlux2Trans}
+
+```
 
 
 
