@@ -9,7 +9,9 @@ Load data from digitized csvs
 ```{r Data}
 Figure3aData <- read.csv("Data/Moore2004Data/Figure3a.csv")
 Figure3bData <- read.csv("Data/Moore2004Data/Figure3b.csv")
+Figure3cData <- read.csv("Data/Moore2004Data/Figure3c.csv")
 Figure7Data <- read.csv("Data/Moore2004Data/Figure7.csv")
+
 ```
 
 Restructure data:
@@ -17,6 +19,7 @@ Restructure data:
 - Lots of fiddling to get day of year into the right date
 - Aggregate into daily values
 - Linear interpolation of missing values
+- Figures 3a and 3c have PSMEo data, but 3c over a longer duration, so use that data in 2000 sapFlux
 
 ```{r structureData}
 sapFlux1999 <- Figure3bData %>% 
@@ -33,9 +36,9 @@ sapFlux1999 <- Figure3bData %>%
   mutate(PSMEy = na.approx(PSMEy),
          ALRUy = na.approx(ALRUy)) %>% 
   gather(tree, sFlux, PSMEy, ALRUy) %>% 
-  filter(!between(DATE, as.Date("1999-07-29"), as.Date("1999-08-04"))) #Data gap in figure 3b. Interpolated later
+  filter(!between(DATE, as.Date("1999-07-29"), as.Date("1999-08-04"))) #Data gap in figure 3b. Interpolate later
 
-sapFlux2000 <- Figure3aData %>% 
+sapFlux20003a <- Figure3aData %>% 
   rename(sFlux = SapFluxDens) %>% 
   mutate(daysInYear = ifelse(leap_year(year), 366, 365)) %>% 
   mutate(decimalDate = year + DOY/daysInYear) %>% 
@@ -48,7 +51,24 @@ sapFlux2000 <- Figure3aData %>%
   padr::pad(interval = "day") %>% 
   mutate(PSMEy = na.approx(PSMEy),
          PSMEo = na.approx(PSMEo)) %>% 
-  gather(tree, sFlux, PSMEy, PSMEo)
+  gather(tree, sFlux, PSMEy, PSMEo) %>% 
+  filter(tree == "PSMEy") #Since PSMEo is in Figure 3c data don't need it here
+
+sapFlux2000 <- Figure3cData %>% 
+  rename(sFlux = SapFluxDens) %>% 
+  mutate(daysInYear = ifelse(leap_year(year), 366, 365)) %>% 
+  mutate(decimalDate = year + DOY/daysInYear) %>% 
+  mutate(dateTime = date_decimal(decimalDate)) %>% 
+  mutate(DATE = as.Date(dateTime)) %>% 
+  group_by(DATE, tree) %>% 
+  summarise(sFluxDaily = mean(sFlux)) %>% 
+  ungroup() %>% 
+  spread(tree,sFluxDaily) %>% 
+  padr::pad(interval = "day") %>% 
+  mutate(TSHEo = na.approx(TSHEo, na.rm = FALSE, rule = 2),
+         PSMEo = na.approx(PSMEo)) %>% 
+  gather(tree, sFlux, TSHEo, PSMEo) %>% 
+  bind_rows(sapFlux20003a) #Add PSMEy from figure 3a
   
 trans2000 <- Figure7Data %>% 
   mutate(daysInYear = ifelse(leap_year(year), 366, 365)) %>% 
