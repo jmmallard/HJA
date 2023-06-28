@@ -360,6 +360,81 @@ winDays2Dates <- function(d) {
 }
 ```
 
+Run climwin analysis with WS6-8 data from Garett
+```{r DataFromGarettQuick}
+load("Data/FromGarett/snow_study_filled_data_workspace_20230623.RData")
+
+climDataPrecip <- pcp.fill %>% 
+  filter(SITECODE == "CENMET") %>% 
+  select(Date, PRECIP_TOT_DAY) %>% 
+  mutate(txtDate = format(Date,"%d/%m/%Y")) %>% #Format data for use with slidingwin function
+  # filter(DATE > as.Date("1978-04-01")) #For when PRIMET came online
+  filter(Date > as.Date("1988-07-12")) #For when vpd sensors came online
+
+# climDataPrecip$precip[is.na(climDataPrecip$precip)] <- 0
+
+lowFlowData <- flow.fill %>% 
+  filter(SITECODE %in% c("GSWS06", "GSWS07", "GSWS08")) %>% 
+  select(Date, TOTAL_Q_AREA.mm, SITECODE) %>% 
+  spread(SITECODE, TOTAL_Q_AREA.mm) %>% 
+  rename(DATE = Date,
+         WS6 = GSWS06,
+         WS7 = GSWS07,
+         WS8 = GSWS08) %>% 
+  drop_na() %>% 
+  mutate(WS6Low = rollmean(WS6, 7, fill = NA, na.rm = FALSE, align = "center"),
+         WS7Low = rollmean(WS7, 7, fill = NA, na.rm = FALSE, align = "center"),
+         WS8Low = rollmean(WS8, 7, fill = NA, na.rm = FALSE, align = "center")) %>% 
+  mutate(Year = year(DATE)) %>% 
+  group_by(Year) %>% 
+  summarize(WS6minQAug = WS6Low[yday(DATE) == 242],
+            WS7minQAug = WS7Low[yday(DATE) == 242],
+            WS8minQAug = WS8Low[yday(DATE) == 242]) %>% 
+  ungroup() %>% 
+  mutate(txtDate = paste0("30/08/",Year))
+
+#Execute climwin function
+WSvarnames <- c("WS6minQAug","WS7minQAug","WS8minQAug")
+# WSvarnames <- "WS6minQAug"
+
+climWinModelsGP <- vector(mode = "list", length = length(WSvarnames)) #preallocate list
+
+for (i in 1:length(WSvarnames)){
+  lowFlowTemp <- lowFlowData %>% #Extract specific WS
+    select(Year, txtDate, minQ = WSvarnames[i]) 
+    
+  winOut <- slidingwin(xvar = list(climData$meanVpd),
+                     cdate = climData$txtDate,
+                     bdate = lowFlowTemp$txtDate,
+                     baseline = lm(minQ ~ 1, data = lowFlowTemp),
+                     cinterval = "day",
+                     range = c(365,10),
+                     type = "relative",
+                     stat = "sum",
+                     func = "lin",
+                     cmissing = "method2" #This method replaces missing values with mean value of all records with same date
+                     )
+
+climWinModelsGP[[i]] <- winOut[[1]]$Dataset
+}
+
+#Visualize
+for (i in 1:length(WSvarnames)) {
+  plot1precip <- plotwin(dataset = climWinModelsGP[[i]]) + ggtitle(paste0("Open/close for 95% set ", WSvarnames[i]))
+  plot2precip <- plotdelta(dataset = climWinModelsGP[[i]]) + ggtitle(paste0("Precip model AICs for ", WSvarnames[i]))
+  plot3precip <- plotweights(dataset = climWinModelsGP[[i]])
+  print(plot1precip)
+  print(plot2precip)
+  print(plot3precip)
+  
+}
+
+
+# head(climWinModels[[4]])
+# 
+# plotdelta(dataset = climWinModels[[4]])
+# plotweights(dataset = climWinModels[[4]])
+```
 
 
 
