@@ -353,10 +353,60 @@ transCheckPlot <- trans2000check %>%
 ggplotly(transCheckPlot)
 ```
 
+Get regression relationship between radiation/vpd and 1999 ALRU sapflux, use to extrapolate to 2000 ALRU sapflux.
+  - Uses sapFlux1999 and gfPRI
+  - Met data only during extrapolation period (April 1 - Nov 1)
+```{r ExtrapolateALRUSapFlux}
+ALRUEx <- sapFlux1999 %>% 
+  filter(tree == "ALRUy") %>% 
+  select(DATE, sFlux) %>% 
+  right_join(gfPRI, by = "DATE")
 
+#Plot bivariates of each
+ALRUvRadPlot <- ALRUEx %>% 
+  drop_na() %>% 
+  ggplot(aes(x = Rad, y = sFlux)) + 
+  geom_point() + 
+  geom_smooth(formula = y ~ x, method = "lm") +
+  stat_cor(aes(label = after_stat(rr.label)), color = "red", geom = "label")
+print(ALRUvRadPlot)
+
+ALRUvVpdPlot <- ALRUEx %>% 
+  drop_na() %>% 
+  ggplot(aes(x = Vpd, y = sFlux)) + 
+  geom_point() + 
+  geom_smooth(formula = y ~ x, method = "lm") +
+  stat_cor(aes(label = after_stat(rr.label)), color = "red", geom = "label")
+print(ALRUvVpdPlot)
+
+#Generate linear models and check them
+RegALRUVpd <- lm(sFlux ~ Vpd, data = ALRUEx)
+RegALRURad <- lm(sFlux ~ Rad, data = ALRUEx)
+RegALRUVpdRad <- lm(sFlux ~ Rad + Vpd, data = ALRUEx)
+RegALRUVpdXRad <- lm(sFlux ~ Rad*Vpd, data = ALRUEx)
+
+summary(RegALRUVpd)
+summary(RegALRURad)
+summary(RegALRUVpdRad)
+summary(RegALRUVpdXRad)
+
+#Use vpd and/or rad to extrapolate ALRU to April 1 - Nov 1 2000
+ALRUExPred <- ALRUEx %>% 
+  add_predictions(model = RegALRUVpdRad, var = "sFluxPred") %>% 
+  mutate(Extrap = ifelse(is.na(sFlux), 1, 0)) %>% #To mark what data is extrapolated vs measured
+  mutate(sFlux = ifelse(is.na(sFlux), sFluxPred, sFlux))
+  
+#Plot extrapolated data
+ALRUPredPlot <- ALRUExPred %>% 
+  filter(between(DATE, as.Date("1999-04-01"), as.Date("2000-10-31"))) %>% 
+  ggplot() +
+  geom_line(aes(x = DATE, y = sFlux, color = Extrap))
+print(ALRUPredPlot)
+```
 
 What about sap flux measurements? Figure 3a is same data as figure 7 but we don't have trans data from Figure 3b
 ```{r SapFlux2Trans}
+
 
 ```
 
