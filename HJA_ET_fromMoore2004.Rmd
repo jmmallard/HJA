@@ -390,7 +390,7 @@ summary(RegALRURad)
 summary(RegALRUVpdRad)
 summary(RegALRUVpdXRad)
 
-#Use vpd and/or rad to extrapolate ALRU to April 1 - Nov 1 2000
+#Use vpd and rad to extrapolate ALRU to April 1 - Nov 1 2000
 ALRUExPred <- ALRUEx %>% 
   add_predictions(model = RegALRUVpdRad, var = "sFluxPred") %>% 
   mutate(Extrap = ifelse(is.na(sFlux), 1, 0)) %>% #To mark what data is extrapolated vs measured
@@ -404,16 +404,104 @@ ALRUPredPlot <- ALRUExPred %>%
 print(ALRUPredPlot)
 ```
 
-Do the same for TSHEo, PSMEo, and PSMEy
+Do the same for TSHEo, PSMEo, and PSMEy: Find best linear models
+  - PSMEo has lowest R2
+  - Best models generally either vpd or both vpd and rad
+  - Since above (ALRUy) uses both predictors do the same here
 ```{r ExtrapolateSapFlux}
 sapFluxEx <- sapFlux2000 %>% 
   spread(tree, sFlux) %>% 
   right_join(gfPRI, by = "DATE")
 
 #Plot bivariates between rad/vpd and each tree species/age
+#Radiation
+# for (i in 2:4) {
+#   tempRadPlot <- sapFluxEx %>% 
+#     select(Rad, i) %>% 
+#     drop_na() %>% 
+#     ggplot(aes_string(colnames(.)[1], colnames(.)[2])) + geom_point()
+#   print(tempRadPlot)
+# }
+# 
+# #Vpd
+# for (i in 2:4) {
+#   tempVpdPlot <- sapFluxEx %>% 
+#     select(Vpd, i) %>% 
+#     drop_na() %>% 
+#     ggplot(aes_string(colnames(.)[1], colnames(.)[2])) + geom_point()
+#   print(tempVpdPlot)
+# }
+
+#Find appropriate linear models for each species/age
+#PSMEo
+lmPSMEoVpd <- lm(PSMEo ~ Vpd, data = sapFluxEx)
+lmPSMEoRad <- lm(PSMEo ~ Rad, data = sapFluxEx)
+lmPSMEoRadVpd <- lm(PSMEo ~ Rad + Vpd, data = sapFluxEx)
+
+#PSMEy
+lmPSMEyVpd <- lm(PSMEy ~ Vpd, data = sapFluxEx)
+lmPSMEyRad <- lm(PSMEy ~ Rad, data = sapFluxEx)
+lmPSMEyRadVpd <- lm(PSMEy ~ Rad + Vpd, data = sapFluxEx)
+
+#TSHEo
+lmTSHEoVpd <- lm(TSHEo ~ Vpd, data = sapFluxEx)
+lmTSHEoRad <- lm(TSHEo ~ Rad, data = sapFluxEx)
+lmTSHEoRadVpd <- lm(TSHEo ~ Rad + Vpd, data = sapFluxEx)
+
+# summary(lmPSMEoVpd)
+# summary(lmPSMEoRad)
+# summary(lmPSMEoRadVpd)
+# summary(lmPSMEyVpd)
+# summary(lmPSMEyRad)
+# summary(lmPSMEyRadVpd)
+# summary(lmTSHEoVpd)
+# summary(lmTSHEoRad)
+# summary(lmTSHEoRadVpd)
+
+#Model using both vpd and rad best option for all 3
+sapFluxPred <- sapFluxEx %>% 
+  add_predictions(model = lmPSMEoRadVpd, var = "PSMEoPred") %>% 
+  add_predictions(model = lmPSMEyRadVpd, var = "PSMEyPred") %>% 
+  add_predictions(model = lmTSHEoRadVpd, var = "TSHEoPred") %>% 
+  mutate(Extrap = ifelse(is.na(PSMEo), 1, 0)) %>% #To mark what data is extrapolated vs measured
+  mutate(PSMEo = ifelse(is.na(PSMEo), PSMEoPred, PSMEo),
+         PSMEy = ifelse(is.na(PSMEy), PSMEyPred, PSMEy),
+         TSHEo = ifelse(is.na(TSHEo), TSHEoPred, TSHEo))
+
+#Plot extrapolated data
+PSMEyPredPlot <- sapFluxPred %>% 
+  filter(between(DATE, as.Date("1999-04-01"), as.Date("2000-10-31"))) %>% 
+  ggplot() +
+  geom_line(aes(x = DATE, y = PSMEy, color = Extrap))
+print(PSMEyPredPlot)
+
+PSMEoPredPlot <- sapFluxPred %>% 
+  filter(between(DATE, as.Date("1999-04-01"), as.Date("2000-10-31"))) %>% 
+  ggplot() +
+  geom_line(aes(x = DATE, y = PSMEo, color = Extrap))
+print(PSMEoPredPlot)
+
+TSHEoPredPlot <- sapFluxPred %>% 
+  filter(between(DATE, as.Date("1999-04-01"), as.Date("2000-10-31"))) %>% 
+  ggplot() +
+  geom_line(aes(x = DATE, y = TSHEo, color = Extrap))
+print(TSHEoPredPlot)
+
+#Combine sap flux data from all four species/ages into a single df
+sapFluxAllPred <- sapFluxPred %>% 
+  select(DATE, PSMEo, PSMEy, TSHEo) %>% 
+  left_join(.,ALRUExPred, by = "DATE") %>% 
+  rename(ALRUy = sFlux) %>% 
+  select(-c(Rad, Vpd, sFluxPred, Extrap))
+
+#Plot all sapFlux time series from May 1 through August 30
+sFluxPlot <- sapFluxAllPred %>% 
+  filter(between(DATE, as.Date("2000-05-01"), as.Date("2000-08-31"))) %>% 
+  gather(tree, sFlux, PSMEo, PSMEy, TSHEo, ALRUy) %>% 
+  ggplot(aes(x = DATE, y = sFlux, color = tree)) + geom_line()
+print(sFluxPlot)
 
 ```
-
 
 
 
