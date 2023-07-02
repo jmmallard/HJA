@@ -404,13 +404,15 @@ ALRUPredPlot <- ALRUExPred %>%
 print(ALRUPredPlot)
 ```
 
-What about sap flux measurements? Figure 3a is same data as figure 7 but we don't have trans data from Figure 3b
-```{r SapFlux2Trans}
+Do the same for TSHEo, PSMEo, and PSMEy
+```{r ExtrapolateSapFlux}
+sapFluxEx <- sapFlux2000 %>% 
+  spread(tree, sFlux) %>% 
+  right_join(gfPRI, by = "DATE")
 
+#Plot bivariates between rad/vpd and each tree species/age
 
 ```
-
-
 
 
 

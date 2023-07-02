@@ -436,6 +436,47 @@ for (i in 1:length(WSvarnames)) {
 # plotweights(dataset = climWinModels[[4]])
 ```
 
+WS3 had a major landslide that ripped out some portion of its riparian zone to bedrock in 1996. Checking some before and after things
+```{r WS3exploration}
+WS3data <- allData %>% 
+  select(DATE, precip, WS3) %>% 
+  rename(Flow = WS3) %>% 
+  mutate(FlowRoll = rollmean(Flow, 7, fill = NA, na.rm = FALSE, align = "center"))
+
+ggplot(data = WS3data, aes(x = DATE, y = precip)) + geom_line()
+
+WS3dataAugLF <- WS3data %>% 
+  mutate(Year = year(DATE)) %>% 
+  group_by(Year) %>% 
+  summarize(WS3minQAug = FlowRoll[yday(DATE) == 242]) %>% 
+  ungroup() %>% 
+  drop_na() %>% 
+  mutate(LS = ifelse(Year < 1996, "Before", "After"))
+
+ggplot(data = WS3dataAugLF, aes(x = Year, y = WS3minQAug, fill = LS)) + geom_bar(stat = "identity")
+
+#Run climwin analysis
+
+climWinModels <- vector(mode = "list", length = 2) #preallocate list
+
+lowFlowTemp <- lowFlowData %>% #Extract specific WS and remove rows with NA
+  select(Year, txtDate, minQ = WSvarnames[i]) %>% 
+  drop_na()
+
+winOut <- slidingwin(xvar = list(climData$meanVpd),
+                     cdate = climData$txtDate,
+                     bdate = lowFlowTemp$txtDate,
+                     baseline = lm(minQ ~ 1, data = lowFlowTemp),
+                     cinterval = "day",
+                     range = c(365,10),
+                     type = "relative",
+                     stat = "mean",
+                     func = "lin",
+                     cmissing = "method2" #This method replaces missing values with mean value of all records with same date
+)
+
+climWinModels[[i]] <- winOut[[1]]$Dataset
+```
 
 
 
