@@ -88,17 +88,17 @@ trans2000 <- Figure7Data %>%
 Figure3aMoore <- sapFlux2000 %>% 
   ggplot(aes(x = DATE, y = sFlux)) +
   geom_line(aes(color = tree))
-ggplotly(Figure3aMoore)
+print(Figure3aMoore)
 
 Figure3bMoore <- sapFlux1999 %>%
 ggplot(aes(x = DATE, y = sFlux)) +
   geom_line(aes(color = tree))
-ggplotly(Figure3bMoore)
+print(Figure3bMoore)
 
 Figure7Moore <- trans2000 %>% 
   ggplot(aes(x = DATE, y = trans)) +
   geom_line(aes(color = stand))
-ggplotly(Figure7Moore)
+print(Figure7Moore)
 
 ```
 
@@ -109,7 +109,7 @@ vpdMoore <- allData %>%
   select(DATE,meanVpd) %>% 
   ggplot(aes(x = DATE, y = meanVpd)) + geom_line()
 
-ggplotly(vpdMoore)
+print(vpdMoore)
 
 #Missing data from 2000-6-4 - 2000-6-21 and 2000-5-24 - 2000-5-31. Check if there are other data in this range at primet
 vpdCheck <- vpdRaw %>% 
@@ -132,7 +132,7 @@ metRad <- radRaw %>%
 radPlot <- metRad %>% 
   ggplot(aes(x = DATE, y = SOLAR_TOT_DAY)) + geom_line()
 
-ggplotly(radPlot)
+print(radPlot)
 #Data gap at 2000-5-24 - 2000-5-31
 ```
 
@@ -503,6 +503,24 @@ print(sFluxPlot)
 
 ```
 
+For manuscript figure X
+  - Calculate transpiration from sap flux density values (sapFluxAllPred) and SBA for appropriate classes 
+    - See eqn 2 and related text in Moore et al
+  - For hillslope hypothesis:
+    - Difference between transpiration for the whole watershed - riparian area:
+      - (PSMEo + TSHEo) - PSMEy
+  - For riparian hypothesis:
+    - Difference between transpiration for just riparian area:
+      - (PSMEo + TSHEo) - ALRUy 
+      
+```{r TranspirationDeficits}
+Tree <- c("PSME", "TSHE", "ALRU", "Ang", "Gym")
+Old <- c(5.5, 9.9, 0.2, 1.3, 15.9)
+Young <- c(13.9, 0.1, 1.5, 7.7, 13.9)
+
+SBAFig6 <- data.frame(Tree, Old, Young) 
+
+```
 
 
 
