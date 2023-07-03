@@ -503,7 +503,7 @@ print(sFluxPlot)
 
 ```
 
-For manuscript figure X
+Data for manuscript figure X (transpiration deficits)
   - Calculate transpiration from sap flux density values (sapFluxAllPred) and SBA for appropriate classes 
     - See eqn 2 and related text in Moore et al
   - For hillslope hypothesis:
@@ -515,23 +515,28 @@ For manuscript figure X
       - (PSMEo + TSHEo) - ALRUy 
     - Multiplied by ratio of riparian area to total area
       
-```{r TranspirationDeficits}
+```{r TranspirationDeficit}
 #Inputs
 StartDate = as.Date("2000-05-01")
-EndDate = as.Date("2000-08-30")
+EndDate = as.Date("2000-09-30")
 
 ATot = 96
 ARip = 2.18
+AMoore = 10.46
 AHill = ATot - ARip
-
+AHillLow = AMoore - ARip
+  
 Tree <- c("PSME", "TSHE", "ALRU", "Ang", "Gym")
 Old <- c(5.5, 9.9, 0.2, 1.3, 15.9)
 Young <- c(13.9, 0.1, 1.5, 7.7, 13.9)
 
 #Restructre SBA
+#Modify SBA from Moore to account for "distributing" trees to different subareas of Moore "riparian" area in young stand
 SBAall <- data.frame(Tree, Old, Young) %>% 
   gather(Stand, SBA, Old, Young) %>% 
-  unite(col = "TreeStand", c("Tree", "Stand"), sep = "")
+  unite(col = "TreeStand", c("Tree", "Stand"), sep = "") %>% 
+  mutate(SBA = ifelse(TreeStand == "PSMEYoung", (SBA * AMoore/AHillLow), SBA)) %>% #Modified SBA for PSMEy
+  mutate(SBA = ifelse(TreeStand == "AngYoung", (SBA * AMoore/ARip), SBA)) #Modified SBA for ALRUy (use AngYoung)
 
 #Calculate daily transpiration numbers
 TransDef <- sapFluxAllPred %>% 
@@ -552,6 +557,46 @@ TransDef <- sapFluxAllPred %>%
   filter(between(DATE, StartDate, EndDate))
 ```
 
+Make some plots of transpiration deficits
+```{r TranspirationDeficitPlots}
+#Transpiration from all tree species
+allTreesTransPlot <- TransDef %>% 
+  select(DATE, transPSMEo, transPSMEy, transTSHEo, transALRUy) %>% 
+  rename(PSMEo = transPSMEo,
+         PSMEy = transPSMEy,
+         TSHEo = transTSHEo,
+         ALRUy = transALRUy) %>% 
+  gather(Tree, Trans, PSMEo, PSMEy, TSHEo, ALRUy) %>% 
+  ggplot(aes(x = DATE, y = Trans, color = Tree)) + geom_line()
+print(allTreesTransPlot)
+
+#Overall Transpiration Deficit
+OverallTransDefPlot <- TransDef %>% 
+  select(DATE, transOld, transYoung) %>% 
+  rename(Old = transOld, Young = transYoung) %>% 
+  gather(Stand, Trans, Old, Young) %>% 
+  ggplot(aes(x = DATE, y = Trans, color = Stand)) + geom_line()
+print(OverallTransDefPlot)
+
+#Hillslope Transpiration Deficit
+HillslopeTransDefPlot <- TransDef %>% 
+  select(DATE, transHillOld, transHillYoung, transDefHill) %>% 
+  gather(Stand, Trans, transHillOld, transHillYoung, transDefHill) %>% 
+  ggplot(aes(x = DATE, y = Trans, color = Stand)) + geom_line()
+print(HillslopeTransDefPlot)
+
+#Riparian Transpiration Deficit
+RiparianTransDefPlot <- TransDef %>% 
+  select(DATE, transRipOld, transRipYoung, transDefRip) %>% 
+  gather(Stand, Trans, transRipOld, transRipYoung, transDefRip) %>% 
+  ggplot(aes(x = DATE, y = Trans, color = Stand)) + geom_line()
+print(RiparianTransDefPlot)
+
+sum(TransDef$transDefHill)
+sum(TransDef$transDefHill[between(TransDef$DATE, as.Date("2000-05-09"), as.Date("2000-06-10"))])
+sum(TransDef$transDefRip)
+sum(TransDef$transDef)
+```
 
 
 
