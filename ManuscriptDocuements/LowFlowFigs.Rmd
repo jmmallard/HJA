@@ -1,0 +1,42 @@
+---
+title: "Low Flow Figures"
+output: html_notebook
+---
+Load packages
+```{r packages}
+library(tidyverse)
+library(lubridate)
+library(ggplot2)
+library(zoo)
+library(climwin)
+library(plotly)
+library(imputeTS)
+library(ggpubr)
+library(ggthemes)
+library(modelr)
+```
+
+Load data
+  - Transpiration deficit data
+
+Figure 1: Site map
+
+Figure 2: Hydro and climate data
+
+Figure 3: Hypothesis figures
+
+Figure 4: Window analysis
+
+Figure 5: Transpiration deficit
+
+S1: Flow deficit
+
+S2: Digitized Moore data
+
+S3: Regressions b/n sap flux density and radiation/vpd
+
+S4: Riparian well time series
+
+S5: Hillslope well time series or soil volumetric content + porosity
+
+S6: Table of calculation values

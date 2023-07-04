@@ -1,8 +1,23 @@
 ---
 title: "HJA_ET_fromMoore2004"
-output: html_notebook
+output:
+  html_document:
+    df_print: paged
 ---
 
+Load packages
+```{r LoadPackages}
+library(tidyverse)
+library(lubridate)
+library(ggplot2)
+library(zoo)
+library(climwin)
+library(plotly)
+library(imputeTS)
+library(ggpubr)
+library(ggthemes)
+library(modelr)
+```
 Attempts to leverage data from Moore et al 2004 study on transpiration at HJA WS1 and 2
 
 Load data from digitized csvs
@@ -518,7 +533,7 @@ Data for manuscript figure X (transpiration deficits)
 ```{r TranspirationDeficit}
 #Inputs
 StartDate = as.Date("2000-05-01")
-EndDate = as.Date("2000-09-30")
+EndDate = as.Date("2000-08-30")
 
 ATot = 96
 ARip = 2.18
@@ -555,6 +570,8 @@ TransDef <- sapFluxAllPred %>%
          transYoung = transHillYoung + transRipYoung) %>% 
   mutate(transDef = transYoung - transOld) %>% 
   filter(between(DATE, StartDate, EndDate))
+
+save(TransDef, file = "TransDef.RData")
 ```
 
 Make some plots of transpiration deficits
