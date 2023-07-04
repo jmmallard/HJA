@@ -564,11 +564,11 @@ TransDef <- sapFluxAllPred %>%
          transHillYoung = transPSMEy * AHill/ATot,
          transRipOld = (transPSMEo + transTSHEo + transOtherGym) * ARip/ATot,
          transRipYoung = transALRUy * ARip/ATot) %>% 
-  mutate(transDefHill = transHillYoung - transHillOld,
-         transDefRip = transRipYoung - transRipOld) %>% 
+  mutate(transDefHill = transHillOld - transHillYoung,
+         transDefRip = transRipOld - transRipYoung) %>% 
   mutate(transOld = transHillOld + transRipOld,
          transYoung = transHillYoung + transRipYoung) %>% 
-  mutate(transDef = transYoung - transOld) %>% 
+  mutate(transDef = transOld - transYoung) %>% 
   filter(between(DATE, StartDate, EndDate))
 
 save(TransDef, file = "TransDef.RData")

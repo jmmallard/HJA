@@ -1,6 +1,8 @@
 ---
 title: "Low Flow Figures"
-output: html_notebook
+output:
+  html_document:
+    df_print: paged
 ---
 Load packages
 ```{r packages}
@@ -18,6 +20,10 @@ library(modelr)
 
 Load data
   - Transpiration deficit data
+```{r}
+load("../TransDef.RData")
+```
+
 
 Figure 1: Site map
 
@@ -28,6 +34,50 @@ Figure 3: Hypothesis figures
 Figure 4: Window analysis
 
 Figure 5: Transpiration deficit
+```{r TransDefFig}
+youngCol = "#4dac26"
+oldCol = "#a6611a"
+ripDefCol = "#01665e"
+hillDefCol = "#80cdc1"
+
+myCols = c(c("Young" = youngCol, "Old" = oldCol, "RipDef" = ripDefCol,  "HillDef" = hillDefCol))
+
+myLineWidth = 2
+
+#Hillslope Transpiration Deficit
+HillslopeTransDefPlot <- TransDef %>% 
+  select(DATE, transHillOld, transHillYoung, transDefHill) %>% 
+  gather(Stand, Trans, transHillOld, transHillYoung, transDefHill) %>% 
+  ggplot(aes(x = DATE, y = Trans, color = Stand)) + geom_line()
+print(HillslopeTransDefPlot)
+
+#Riparian Transpiration Deficit
+RiparianTransDefPlot <- TransDef %>% 
+  select(DATE, transRipOld, transRipYoung, transDefRip) %>% 
+  ggplot() +
+  geom_line(aes(x = DATE, y = transRipYoung, color = "Young"), 
+            linewidth = myLineWidth) + 
+  geom_line(aes(x = DATE, y = transRipOld, color = "Old"), 
+            linewidth = myLineWidth) +
+  geom_bar(aes(x = DATE, y = transDefRip, fill = "RipDef"), stat = "identity", 
+           width = 1) +
+  theme_bw() +
+  scale_x_date(expand = c(0,0)) +
+  labs(x = "", y = "Transpiration (mm/d)") +
+  # theme(legend.position = c(0, 1),legend.justification = c(0, 1)) +
+  scale_fill_manual(name = "", values = myCols) +
+  scale_color_manual(name = "", values = myCols)
+print(RiparianTransDefPlot)
+
+#Overall Transpiration Deficit
+OverallTransDefPlot <- TransDef %>% 
+  select(DATE, transOld, transYoung, transDef) %>% 
+  rename(Old = transOld, Young = transYoung, Def = transDef) %>% 
+  gather(Stand, Trans, Old, Young, Def) %>% 
+  ggplot(aes(x = DATE, y = Trans, color = Stand)) + geom_line()
+print(OverallTransDefPlot)
+```
+
 
 S1: Flow deficit
 
