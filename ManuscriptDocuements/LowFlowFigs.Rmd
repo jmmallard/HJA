@@ -5,7 +5,7 @@ output:
     df_print: paged
 ---
 Load packages
-```{r packages}
+```{r packages, message=FALSE, echo=FALSE, warning=FALSE}
 library(tidyverse)
 library(lubridate)
 library(ggplot2)
@@ -20,8 +20,10 @@ library(modelr)
 
 Load data
   - Transpiration deficit data
-```{r}
-load("../TransDef.RData")
+```{r loadData, echo=FALSE}
+# load("../TransDef.RData") #If being knit
+load("TransDef.RData")
+WS1Profile <- read.csv("Data/WS01Profile.csv")
 ```
 
 
@@ -30,6 +32,19 @@ Figure 1: Site map
 Figure 2: Hydro and climate data
 
 Figure 3: Hypothesis figures
+```{r HypothesisFigures}
+WS1Plot <- WS1Profile %>% 
+  mutate(SoilDepth = Elev_m - 2) %>% 
+  ggplot() +
+  geom_line(aes(x = Dist_m, y = Elev_m)) +
+  geom_line(aes(x = Dist_m, y = SoilDepth), color = "brown") +
+  theme_bw()
+  # theme(axis.text.x = element_blank(), axis.text.y = element_blank()) +
+  # labs(x = "", y = "")
+
+print(WS1Plot)
+```
+
 
 Figure 4: Window analysis
 
@@ -40,42 +55,60 @@ oldCol = "#a6611a"
 ripDefCol = "#01665e"
 hillDefCol = "#80cdc1"
 
-myCols = c(c("Young" = youngCol, "Old" = oldCol, "RipDef" = ripDefCol,  "HillDef" = hillDefCol))
+myCols = c(c("Young" = youngCol, "Old" = oldCol, "HillDef" = hillDefCol, "RipDef" = ripDefCol))
 
 myLineWidth = 2
+myTxtSz = 20
 
 #Hillslope Transpiration Deficit
 HillslopeTransDefPlot <- TransDef %>% 
   select(DATE, transHillOld, transHillYoung, transDefHill) %>% 
-  gather(Stand, Trans, transHillOld, transHillYoung, transDefHill) %>% 
-  ggplot(aes(x = DATE, y = Trans, color = Stand)) + geom_line()
+  ggplot() +
+  geom_area(aes(x = DATE, y = transHillYoung, fill = "Young"), 
+            alpha = 0.3) + 
+  geom_area(aes(x = DATE, y = transHillOld, fill = "Old"), 
+            alpha = 0.3) +
+  geom_area(aes(x = DATE, y = transDefHill, fill = "HillDef"), 
+            alpha = 0.7) +
+  theme_bw(base_size = myTxtSz) +
+  scale_x_date(expand = c(0,0)) +
+  labs(x = "", y = "Transpiration (mm/d)") +
+  scale_fill_manual(name = "", values = myCols)
 print(HillslopeTransDefPlot)
 
 #Riparian Transpiration Deficit
 RiparianTransDefPlot <- TransDef %>% 
   select(DATE, transRipOld, transRipYoung, transDefRip) %>% 
   ggplot() +
-  geom_line(aes(x = DATE, y = transRipYoung, color = "Young"), 
-            linewidth = myLineWidth) + 
-  geom_line(aes(x = DATE, y = transRipOld, color = "Old"), 
-            linewidth = myLineWidth) +
-  geom_bar(aes(x = DATE, y = transDefRip, fill = "RipDef"), stat = "identity", 
-           width = 1) +
-  theme_bw() +
+  geom_area(aes(x = DATE, y = transRipYoung, fill = "Young"), 
+            alpha = 0.3) + 
+  geom_area(aes(x = DATE, y = transRipOld, fill = "Old"), 
+            alpha = 0.3) +
+  geom_area(aes(x = DATE, y = transDefRip, fill = "RipDef"),
+            alpha = 0.7) +
+  theme_bw(base_size = myTxtSz) +
   scale_x_date(expand = c(0,0)) +
   labs(x = "", y = "Transpiration (mm/d)") +
-  # theme(legend.position = c(0, 1),legend.justification = c(0, 1)) +
-  scale_fill_manual(name = "", values = myCols) +
-  scale_color_manual(name = "", values = myCols)
+  scale_fill_manual(name = "", values = myCols)
 print(RiparianTransDefPlot)
 
 #Overall Transpiration Deficit
+myCols = c(Rip = ripDefCol, Hill = hillDefCol)
+
 OverallTransDefPlot <- TransDef %>% 
-  select(DATE, transOld, transYoung, transDef) %>% 
-  rename(Old = transOld, Young = transYoung, Def = transDef) %>% 
-  gather(Stand, Trans, Old, Young, Def) %>% 
-  ggplot(aes(x = DATE, y = Trans, color = Stand)) + geom_line()
-print(OverallTransDefPlot)
+  select(DATE, transDefRip, transDefHill) %>% 
+  mutate(Rip = cumsum(transDefRip),
+         Hill = cumsum(transDefHill)) %>% 
+  select(-c(transDefRip, transDefHill)) %>% 
+  gather(Position, sumTrans, Rip, Hill) %>% 
+  ggplot(aes(x = DATE, y = sumTrans, fill = Position)) +
+  geom_area(alpha = 0.7) +
+  scale_fill_manual(name = "", values = myCols) +
+   theme_bw(base_size = myTxtSz) +
+  scale_x_date(expand = c(0,0)) +
+  labs(x = "", y = "\u03A3 Transpiration (mm)")
+print(OverallTransDefPlot)  
+
 ```
 
 

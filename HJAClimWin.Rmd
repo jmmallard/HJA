@@ -331,23 +331,24 @@ for (i in 1:nrow(tileTopModels)) {
 tilePlots <- tileTopModels %>% 
   ggplot(aes(x = winDays2Dates(winDay), y = WS, fill = nModDay)) +
   geom_tile() + facet_wrap(~ climVar) +
-  labs(title = paste("Top ", numTopModels, " models explaining Aug 30 low flow"),
+  labs( # title = paste("Top ", numTopModels, " models explaining Aug 30 low flow"),
        x = "Open and close days",
        y = "Watershed",
        fill = "# of models"
-       )
+       ) +
+  theme_bw(base_size = 20)
 print(tilePlots)
 
 #Just WS2 as a bar chart
-WS2WinPlot <- tileTopModels %>% 
-  filter(WS == "WS2") %>% 
-  mutate(winDate = winDays2Dates(winDay)) %>% 
-  ggplot(aes(x = winDate, y = nModDay, fill = nModDay)) +
-  geom_col(width = 1) +
-  facet_wrap(~ climVar) +
-  scale_y_continuous(expand = c(0,0))
-
-print(WS2WinPlot)
+# WS2WinPlot <- tileTopModels %>% 
+#   filter(WS == "WS2") %>% 
+#   mutate(winDate = winDays2Dates(winDay)) %>% 
+#   ggplot(aes(x = winDate, y = nModDay, fill = nModDay)) +
+#   geom_col(width = 1) +
+#   facet_wrap(~ climVar) +
+#   scale_y_continuous(expand = c(0,0))
+# 
+# print(WS2WinPlot)
 
 ```
 

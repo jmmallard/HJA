@@ -78,56 +78,55 @@ hydgrf <- allData %>%
 print(hydgrf)
 
 #Restructure data to plot all hydrographs over each other
-allHydgrfs <- allData %>% 
+allHydgrfData <- allData %>% 
   filter(WY >= 1988 & WY <= 2019) %>% 
   select(DATE, WS2, WY) %>% 
   mutate(DATE2 = case_when(
     month(DATE) %in% c(10,11,12) ~ ymd(format(DATE, "2099-%m-%d")),
     month(DATE) %in% c(1,2,3,4,5,6,7,8,9) ~ ymd(format(DATE, "2100-%m-%d")))) %>% 
+  drop_na()
+
+meanHydgrfData <- allHydgrfData %>% 
+  group_by(DATE2) %>% 
+  summarize(meanWS2 = mean(WS2))
+  
+# allHydgrfPlot <- allHydgrfData %>% 
+  
+allHydgrfPlot <- ggplot() +
+  geom_line(data = allHydgrfData, aes(x = DATE2, y = WS2, group = WY), color = "#d9d9d9") +
+  geom_line(data = meanHydgrfData, aes(x = DATE2, y = meanWS2), linewidth = 1.5, color = "#2b8cbe") +
+  theme_bw(base_size = 20) +
+  labs(x = "", y = "Runoff (mm/d)") +
+  scale_x_date(expand = c(0,0),
+               date_labels = "%b") +
+  scale_y_continuous(expand = c(0,0))
+
+print(allHydgrfPlot)
+
+#Plot all precip
+precipData <- allData %>% 
+  filter(WY >= 1988 & WY <= 2019) %>% 
+  select(DATE, precip) %>% 
+  mutate(precipMonth = month(DATE),
+         precipYear = year(DATE)) %>% 
+  group_by(precipMonth, precipYear) %>% 
+  summarize(monPrecip = sum(precip, na.rm = TRUE)) %>% 
+  ungroup() %>% 
+  group_by(precipMonth) %>% 
+  summarise(meanPrecip = mean(monPrecip, na.rm = TRUE),
+            upPrecip = quantile(monPrecip, 0.95, na.rm = TRUE),
+            lowPrecip = quantile(monPrecip, 0.05, na.rm = TRUE))
+
+precipPlot <- precipData %>% 
+  mutate(WYMonth = c(4:12,1:3)) %>% 
   ggplot() +
-  geom_line(aes(x = DATE2, y = WS2, group = WY), color = "#d9d9d9")
+  geom_bar(aes(x = WYMonth, y = meanPrecip), fill = "steelblue", stat = "identity") +
+  geom_errorbar(aes(x = WYMonth, ymin = lowPrecip, ymax = upPrecip)) +
+  scale_x_continuous(expand = c(0,0)) +
+  theme_bw(base_size = 20) +
+  labs(x = "", y = "Precip (mm/mon)")
 
-print(allHydgrfs)
-
-#From Garett
-summary.plot.swe = swe_fill %>% 
-  filter(waterYear > "1998" & waterYear < "2019") %>% 
-  group_by(SITECODE, wy.day) %>% 
-  summarise(med.swe=median(SWE_DAY, na.rm=TRUE)) %>%
-  ungroup()
-
-swe_fill %>% 
-  # filter(SITECODE %in% c("CENMET", "PRIMET", "UPLMET")) %>%
-  filter(SITECODE %in% c("CENMET")) %>%
-  filter(waterYear > "1998" & waterYear < "2019") %>% 
-  mutate(snow.amt.cat=as.factor(case_when(
-    waterYear %in% c(1999,2002,2008,2013,2017) ~ "High",
-    waterYear %in% c(2003, 2005, 2010, 2014, 2015) ~ "Low",
-    TRUE ~ "Average"
-  ))) %>% 
-  ggplot() +
-  # geom_line(aes(x=wy.day, y=SWE_DAY, group=waterYear), color="gray") +
-  geom_line(aes(x=wy.day, y=SWE_DAY, group=waterYear, color=snow.amt.cat)) +
-  scale_color_manual(values=c("gray","#0081bd","#9c0505")) +
-  geom_line(data=summary.plot.swe %>% filter(SITECODE %in% c("CENMET")),
-            aes(x=wy.day, y=med.swe), color="black", linewidth=1) +
-  # scale_x_date(expand=c(0,1), date_labels="%b", date_breaks="1 month") +
-  # facet_grid(SITECODE~., scales="free") +
-  scale_x_continuous(expand=c(0,0)) +
-  scale_y_continuous(expand=expansion(mult=c(0,0.05))) +
-  theme_bw() +
-  theme(
-    panel.background=element_rect(color="black"),  # change plot outline color
-    strip.text=element_text(size=14, color="black"),  # facet text
-    strip.background=element_rect(color=NA, fill=NA),  # facet background
-    axis.text=element_text(size=10, color="black"),  # axis labels
-    axis.title=element_text(size=12, color="black"), # axis title
-    legend.text=element_text(size=12, color="black"),  # legend text
-    legend.title=element_text(size=12, color="black"),  # legend title text
-    legend.position="bottom"
-  ) +
-  labs(x="Water Year Day", y="Snow Water Equivalent (mm)", 
-       color="")
+print(precipPlot)
 
 ```
 
