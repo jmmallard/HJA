@@ -43,6 +43,7 @@ WS1Plot <- WS1Profile %>%
   # labs(x = "", y = "")
 
 print(WS1Plot)
+ggsave("ManuscriptDocuments/Figures/WS1Profile.pdf", plot = WS1Plot)
 ```
 
 
