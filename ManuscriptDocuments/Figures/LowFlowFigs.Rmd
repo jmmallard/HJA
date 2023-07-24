@@ -1,0 +1,125 @@
+---
+title: "Low Flow Figures"
+output:
+  html_document:
+    df_print: paged
+---
+Load packages
+```{r packages, message=FALSE, echo=FALSE, warning=FALSE}
+library(tidyverse)
+library(lubridate)
+library(ggplot2)
+library(zoo)
+library(climwin)
+library(plotly)
+library(imputeTS)
+library(ggpubr)
+library(ggthemes)
+library(modelr)
+```
+
+Load data
+  - Transpiration deficit data
+```{r loadData, echo=FALSE}
+# load("../TransDef.RData") #If being knit
+load("TransDef.RData")
+WS1Profile <- read.csv("Data/WS01Profile.csv")
+```
+
+
+Figure 1: Site map
+
+Figure 2: Hydro and climate data
+
+Figure 3: Hypothesis figures
+```{r HypothesisFigures}
+WS1Plot <- WS1Profile %>% 
+  mutate(SoilDepth = Elev_m - 2) %>% 
+  ggplot() +
+  geom_line(aes(x = Dist_m, y = Elev_m)) +
+  geom_line(aes(x = Dist_m, y = SoilDepth), color = "brown") +
+  theme_bw()
+  # theme(axis.text.x = element_blank(), axis.text.y = element_blank()) +
+  # labs(x = "", y = "")
+
+print(WS1Plot)
+```
+
+
+Figure 4: Window analysis
+
+Figure 5: Transpiration deficit
+```{r TransDefFig}
+youngCol = "#4dac26"
+oldCol = "#a6611a"
+ripDefCol = "#01665e"
+hillDefCol = "#80cdc1"
+
+myCols = c(c("Young" = youngCol, "Old" = oldCol, "HillDef" = hillDefCol, "RipDef" = ripDefCol))
+
+myLineWidth = 2
+myTxtSz = 20
+
+#Hillslope Transpiration Deficit
+HillslopeTransDefPlot <- TransDef %>% 
+  select(DATE, transHillOld, transHillYoung, transDefHill) %>% 
+  ggplot() +
+  geom_area(aes(x = DATE, y = transHillYoung, fill = "Young"), 
+            alpha = 0.3) + 
+  geom_area(aes(x = DATE, y = transHillOld, fill = "Old"), 
+            alpha = 0.3) +
+  geom_area(aes(x = DATE, y = transDefHill, fill = "HillDef"), 
+            alpha = 0.7) +
+  theme_bw(base_size = myTxtSz) +
+  scale_x_date(expand = c(0,0)) +
+  labs(x = "", y = "Transpiration (mm/d)") +
+  scale_fill_manual(name = "", values = myCols)
+print(HillslopeTransDefPlot)
+
+#Riparian Transpiration Deficit
+RiparianTransDefPlot <- TransDef %>% 
+  select(DATE, transRipOld, transRipYoung, transDefRip) %>% 
+  ggplot() +
+  geom_area(aes(x = DATE, y = transRipYoung, fill = "Young"), 
+            alpha = 0.3) + 
+  geom_area(aes(x = DATE, y = transRipOld, fill = "Old"), 
+            alpha = 0.3) +
+  geom_area(aes(x = DATE, y = transDefRip, fill = "RipDef"),
+            alpha = 0.7) +
+  theme_bw(base_size = myTxtSz) +
+  scale_x_date(expand = c(0,0)) +
+  labs(x = "", y = "Transpiration (mm/d)") +
+  scale_fill_manual(name = "", values = myCols)
+print(RiparianTransDefPlot)
+
+#Overall Transpiration Deficit
+myCols = c(Rip = ripDefCol, Hill = hillDefCol)
+
+OverallTransDefPlot <- TransDef %>% 
+  select(DATE, transDefRip, transDefHill) %>% 
+  mutate(Rip = cumsum(transDefRip),
+         Hill = cumsum(transDefHill)) %>% 
+  select(-c(transDefRip, transDefHill)) %>% 
+  gather(Position, sumTrans, Rip, Hill) %>% 
+  ggplot(aes(x = DATE, y = sumTrans, fill = Position)) +
+  geom_area(alpha = 0.7) +
+  scale_fill_manual(name = "", values = myCols) +
+   theme_bw(base_size = myTxtSz) +
+  scale_x_date(expand = c(0,0)) +
+  labs(x = "", y = "\u03A3 Transpiration (mm)")
+print(OverallTransDefPlot)  
+
+```
+
+
+S1: Flow deficit
+
+S2: Digitized Moore data
+
+S3: Regressions b/n sap flux density and radiation/vpd
+
+S4: Riparian well time series
+
+S5: Hillslope well time series or soil volumetric content + porosity
+
+S6: Table of calculation values
