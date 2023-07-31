@@ -9,36 +9,40 @@ Figures for presentation at 2023 ICRW8 conference
 soilWaterRaw <- read.csv("Data/KJ_WS1_2019_soil_water.csv")
 
 soilWater <- soilWaterRaw %>% 
-  mutate(DT = mdy_hm(datetime)) %>% 
-  mutate(wp_kPa_50cm = ifelse(wp_kPa_50cm < -40, -40, wp_kPa_50cm)) %>% 
-  mutate(wpMA = rollmean(wp_kPa_50cm, 10, fill = NA))
+  mutate(D = as.Date(mdy_hm(datetime), format = "%m/%d/%Y")) %>% 
+  group_by(D, site) %>% 
+  summarize(wp = mean(wp_kPa_50cm, na.rm = TRUE)) %>% 
+  ungroup() %>% 
+  mutate(wpMA = rollmean(wp, 1, fill = NA))
 
-soilWaterPlot1 <- ggplot(data = soilWater, aes(x = DT, y = wp_kPa_50cm, group = site)) +
-  geom_line() +
-  labs(
-       y = "WP, 50 cm (kPa)")
+# soilWaterPlot1 <- ggplot(data = soilWater, aes(x = DT, y = wp_kPa_50cm, group = site)) +
+#   geom_line() +
+#   labs(
+#        y = "WP, 50 cm (kPa)")
+# 
+# soilWaterPlot2 <- ggplot(data = soilWater, aes(x = DT, y = vwc_50cm, group = site)) +
+#   geom_line() +
+#   labs(
+#        y = "VWC, 50 cm")
+# 
+# soilWaterPlot3 <- ggplot(data = soilWater, aes(x = DT, y = vwc_100cm, group = site)) +
+#   geom_line() +
+#   labs(
+#        y = "VWC, 100 cm")
+# 
+# soilWaterPlot <- grid.arrange(soilWaterPlot1, soilWaterPlot2, soilWaterPlot3, nrow = 3)
 
-soilWaterPlot2 <- ggplot(data = soilWater, aes(x = DT, y = vwc_50cm, group = site)) +
-  geom_line() +
-  labs(
-       y = "VWC, 50 cm")
-
-soilWaterPlot3 <- ggplot(data = soilWater, aes(x = DT, y = vwc_100cm, group = site)) +
-  geom_line() +
-  labs(
-       y = "VWC, 100 cm")
-
-soilWaterPlot <- grid.arrange(soilWaterPlot1, soilWaterPlot2, soilWaterPlot3, nrow = 3)
-
-print(soilWaterPlot)
+# print(soilWaterPlot)
 
 soilWaterPotential <- ggplot(data = soilWater[!is.na(soilWater$wpMA),],
-                             aes(x = DT, y = wpMA, group = site)) +
-  geom_line(size = 0.7) +
-  scale_y_continuous(limits = c(-39,-7), expand = c(0,0)) +
+                             aes(x = D, y = wpMA, group = site)) +
+  geom_line(size = 0.5, color = "steelblue") +
+  scale_y_continuous(expand = c(0,0)) +
+  scale_x_date(date_labels = "%b-%y", expand = c(0,0)) +
+  coord_cartesian(ylim = c(-100000, -7)) +
   labs(x = "", y = "WP, 50 cm (kPa)") +
-  theme_bw()
-print(soilWaterPotential)
+  theme_bw(base_size = 20)
+ggplotly(soilWaterPotential)
 ```
 
 Sites where low flow studies have been done
