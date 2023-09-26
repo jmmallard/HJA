@@ -1,0 +1,107 @@
+---
+title: "HJA_OpenET_WB"
+output: html_notebook
+---
+
+Load packages
+```{r LoadPackages}
+library(tidyverse)
+library(lubridate)
+library(ggplot2)
+library(zoo)
+library(climwin)
+library(plotly)
+library(imputeTS)
+library(ggpubr)
+library(ggthemes)
+library(modelr)
+```
+
+OpenET data
+```{r OpenET}
+WS1_OpenET_raw <- read.csv("Data/OpenET/WS1_OpenET_Cum.csv")
+WS2_OpenET_raw <- read.csv("Data/OpenET/WS2_OpenET_Cum.csv")
+WS3_OpenET_raw <- read.csv("Data/OpenET/WS3_OpenET_Cum.csv")
+All_OpenET_raw <- read.csv("Data/OpenET/All_WS_Summary.csv")
+WS1Rip_OpenET_raw <- read.csv("Data/OpenET/WS1Rip_OpenET_raw.csv")
+WS3Young_OpenET_raw <- read.csv("Data/OpenET/WS3Young_OpenET_raw.csv")
+WS3Old_OpenET_raw <- read.csv("Data/OpenET/WS3Old_OpenET_raw.csv")
+
+```
+
+Restructure data to be continuous long time series using function below and convert to monthly from cumulative
+```{r RestructureOpenET}
+WS1_All_OET <- open_et_cum(WS1_OpenET_raw)
+WS2_All_OET <- open_et_cum(WS2_OpenET_raw)
+WS3_All_OET <- open_et_cum(WS3_OpenET_raw)
+WS1_Rip_OET <- open_et_cum(WS1Rip_OpenET_raw)
+WS3_Young_OET <- open_et_cum(WS3Young_OpenET_raw)
+WS3_Old_OET <- open_et_cum(WS3Old_OpenET_raw)
+```
+
+Function to restructure OpenET cumulative output data and convert to monthly
+```{r RestructureOpenETfxn}
+open_et_cum <- function(csv){
+  csv %>% 
+  gather(Year, ET, c(2,4,6,8,10,12)) %>%
+  select(Category, Year, ET) %>%
+  mutate(Year = as.numeric(str_sub(Year, -4, -1))) %>%
+  mutate(Month = rep(1:12, times = 6)) %>%
+  mutate(DATE = make_date(year = Year, month = Month, day = 1)) %>%
+  select(DATE, ET) %>% 
+  mutate(ET = case_when())
+
+}
+```
+
+Watershed water balance
+```{r WatershedWB}
+WSAnnData <- allData %>% 
+  select(DATE, precip, WS1, WS2, WS3, WY) %>% 
+  filter(between(WY, 1980, 2018)) %>% 
+  group_by(WY) %>% 
+  summarize(annP = sum(precip, na.rm = TRUE),
+            annWS1 = sum(WS1, na.rm = TRUE),
+            annWS2 = sum(WS2, na.rm = TRUE),
+            annWS3 = sum(WS3, na.rm = TRUE)) %>% 
+  mutate(WS1res = annP - annWS1,
+         WS2res = annP - annWS2,
+         WS3res = annP - annWS3)
+
+```
+
+Some plots of above
+```{r WB_Plots}
+All_OpenET <- All_OpenET_raw %>% 
+  select(WY = Year, 
+         WS = WS,
+         ET = AnnET) %>% 
+  mutate(WS = case_when(WS == 1 ~ "WS1_OET",
+                        WS == 2 ~ "WS2_OET",
+                        WS == 3 ~ "WS3_OET"))
+
+WBplot <- WSAnnData %>% 
+  select(WY, WS1res, WS2res, WS3res) %>% 
+  rename(WS1 = WS1res,
+         WS2 = WS2res,
+         WS3 = WS3res) %>% 
+  gather(WS, ET, WS1, WS2, WS3) %>% 
+  bind_rows(All_OpenET) %>% 
+  ggplot(aes(x = WY, y = ET, color = WS)) +
+    geom_point() + xlab("Year") + ylab("P - Q or OpenET")
+  
+
+print(WBplot)
+```
+
+Compare ET between riparian and total WS1
+```{r Riparian Comparison}
+WS1_Comp_OET <- WS1_All_OET %>% 
+  rename(All = ET) %>% 
+  merge(WS1_Rip_OET) %>% 
+  rename(Rip = ET)
+  # mutate(All = c(All[1], diff(All)),
+  #        Rip = c(Rip[1], diff(Rip)))
+
+```
+

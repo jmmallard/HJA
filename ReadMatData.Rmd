@@ -1,0 +1,14 @@
+---
+title: "ReadMatData"
+output: html_notebook
+---
+
+```{r packages}
+library(R.matlab)
+```
+
+```{r openData}
+WS1matStream <- readMat("Data/HJA_SpatialData/WS1fromNoah/stream.mat")
+WS1matValley <- readMat("Data/HJA_SpatialData/WS1fromNoah/valley.mat")
+```
+

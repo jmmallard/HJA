@@ -1,0 +1,58 @@
+---
+title: "HJA_Terrain"
+output: html_notebook
+---
+
+```{r packages}
+library(whitebox) 
+library(raster)
+library(mapview)
+library(mapedit)
+```
+
+Define directories. Load WS1 1m clipped DEM. Data from HJA repository and processed in QGIS into format for use with R Whitebox Tools
+```{r LoadSpatialData}
+LidarDir = "Data/HJA_SpatialData/Lidar/"
+ShpDir = "Data/HJA_SpatialData/Shapefiles/"
+WbtDir = "Data/HJA_SpatialData/WtbOutputs/"
+
+WS1demRaw = raster(paste0(LidarDir,"DEMWS1bound.tif"))
+```
+
+Create pre-processed DEM, D8 flow accumulation, and streams raster
+```{r}
+#Breach depressions in DEM
+wbt_breach_depressions_least_cost(paste0(LidarDir,"DEMWS1bound.tif"), paste0(WbtDir,"DEMWS1Breach.tif"), dist = 10)
+
+#Fill depressions in DEM
+# wbt_fill_depressions(paste0(LidarDir,"DEMWS1bound.tif"), paste0(WbtDir,"DEMWS1Fill.tif"))
+
+#D8 pointer
+wbt_d8_pointer(paste0(WbtDir,"DEMWS1Breach.tif"), paste0(WbtDir,"D8PtrWS1Breach.tif"))
+
+#Create D8 flow accumulation
+wbt_d8_flow_accumulation(paste0(WbtDir,"D8PtrWS1Breach.tif"), paste0(WbtDir,"D8AccWS1Breach.tif"))
+
+#Extract stream raster
+wbt_extract_streams(paste0(WbtDir,"D8AccWS1Breach.tif"), paste0(WbtDir,"StreamRasterWS1Breach.tif"), threshold = 20000)
+
+#Create stream vector
+# wbt_raster_streams_to_vector(paste0(WbtDir,"StreamRasterWS1Breach.tif"), paste0(WbtDir,"D8PtrWS1Breach.tif"), paste0(WbtDir,"StreamsWS1Breach.shp"))
+```
+
+Calculate elevation above creek
+```{r EAC}
+
+```
+
+
+```{r VisualizeRasters}
+myRaster = raster(paste0(WbtDir,"StreamRasterWS1Breach.tif"))
+
+mapview(myRaster)
+
+image(myRaster)
+
+plot(myRaster)
+```
+
