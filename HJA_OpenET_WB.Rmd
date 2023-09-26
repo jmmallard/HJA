@@ -18,7 +18,7 @@ library(modelr)
 ```
 
 OpenET data
-```{r OpenET}
+```{r LoadOpenETData}
 WS1_OpenET_raw <- read.csv("Data/OpenET/WS1_OpenET_Cum.csv")
 WS2_OpenET_raw <- read.csv("Data/OpenET/WS2_OpenET_Cum.csv")
 WS3_OpenET_raw <- read.csv("Data/OpenET/WS3_OpenET_Cum.csv")
@@ -27,16 +27,6 @@ WS1Rip_OpenET_raw <- read.csv("Data/OpenET/WS1Rip_OpenET_raw.csv")
 WS3Young_OpenET_raw <- read.csv("Data/OpenET/WS3Young_OpenET_raw.csv")
 WS3Old_OpenET_raw <- read.csv("Data/OpenET/WS3Old_OpenET_raw.csv")
 
-```
-
-Restructure data to be continuous long time series using function below and convert to monthly from cumulative
-```{r RestructureOpenET}
-WS1_All_OET <- open_et_cum(WS1_OpenET_raw)
-WS2_All_OET <- open_et_cum(WS2_OpenET_raw)
-WS3_All_OET <- open_et_cum(WS3_OpenET_raw)
-WS1_Rip_OET <- open_et_cum(WS1Rip_OpenET_raw)
-WS3_Young_OET <- open_et_cum(WS3Young_OpenET_raw)
-WS3_Old_OET <- open_et_cum(WS3Old_OpenET_raw)
 ```
 
 Function to restructure OpenET cumulative output data and convert to monthly
@@ -49,9 +39,19 @@ open_et_cum <- function(csv){
   mutate(Month = rep(1:12, times = 6)) %>%
   mutate(DATE = make_date(year = Year, month = Month, day = 1)) %>%
   select(DATE, ET) %>% 
-  mutate(ET = case_when())
-
+  mutate(ET = case_when(month(DATE) == 1 ~ ET,
+                        month(DATE) != 1 ~ ET - lag(ET, n = 1)))
 }
+```
+
+Restructure data to be continuous long time series using function above and convert to monthly from cumulative
+```{r RestructureOpenET}
+WS1_All_OET <- open_et_cum(WS1_OpenET_raw)
+WS2_All_OET <- open_et_cum(WS2_OpenET_raw)
+WS3_All_OET <- open_et_cum(WS3_OpenET_raw)
+WS1_Rip_OET <- open_et_cum(WS1Rip_OpenET_raw)
+WS3_Young_OET <- open_et_cum(WS3Young_OpenET_raw)
+WS3_Old_OET <- open_et_cum(WS3Old_OpenET_raw)
 ```
 
 Watershed water balance
@@ -88,7 +88,7 @@ WBplot <- WSAnnData %>%
   gather(WS, ET, WS1, WS2, WS3) %>% 
   bind_rows(All_OpenET) %>% 
   ggplot(aes(x = WY, y = ET, color = WS)) +
-    geom_point() + xlab("Year") + ylab("P - Q or OpenET")
+    geom_point() + xlab("Year") + ylab("P - Q or OpenET") 
   
 
 print(WBplot)
@@ -99,9 +99,79 @@ Compare ET between riparian and total WS1
 WS1_Comp_OET <- WS1_All_OET %>% 
   rename(All = ET) %>% 
   merge(WS1_Rip_OET) %>% 
-  rename(Rip = ET)
-  # mutate(All = c(All[1], diff(All)),
-  #        Rip = c(Rip[1], diff(Rip)))
+  rename(Rip = ET) %>% 
+  drop_na() %>% 
+  mutate(Diff = All - Rip,
+         DiffPer = 100 * (All - Rip)/All)
+
+#Over the whole time series
+WS1_Comp_OET_TS <- WS1_Comp_OET %>% 
+  ggplot(aes(x = DATE, y = DiffPer)) +
+    geom_point() +
+    xlab("DATE") + ylab("Diff ET (mm or %)") + ggtitle("WS1 All ET - WS1 Riparian ET")
+
+#Looking at monthly summaries
+WS1_Comp_OET_ByMonth <- WS1_Comp_OET %>% 
+  mutate(Month = month(DATE)) %>% 
+  group_by(Month) %>% 
+  summarise(AllMon = mean(All),
+            RipMon = mean(Rip)) %>% 
+  ungroup() %>% 
+  mutate(DiffMon = AllMon - RipMon,
+         DiffPerMon = 100 * (AllMon - RipMon)/AllMon) %>% 
+  ggplot(aes(x = Month, y = DiffMon)) +
+    geom_point() +
+    xlab("Month") + ylab("Diff ET (mm or %)") + ggtitle("WS1 All ET - WS1 Riparian ET")
+
+#Plots
+print(WS1_Comp_OET_TS)
+# ggplotly(WS1_Comp_OET_TS)  
+print(WS1_Comp_OET_ByMonth)
+# ggplotly(WS1_Comp_OET_ByMonth)
+```
+
+Compare time series of ET from OpenET derived from adjacent, same aspect patches of old and young growth forest
+```{r OldYoungWS3Comparison}
+WS3_Comp_OET <- WS3_Old_OET %>% 
+  rename(Old = ET) %>% 
+  merge(WS3_Young_OET) %>% 
+  rename(Young = ET) %>% 
+  drop_na() %>% 
+  mutate(Diff = Old - Young,
+         DiffPer = 100 * (Old - Young)/Old)
+
+#Total time series comparison
+WS3_Comp_OET_TS <- WS3_Comp_OET %>% 
+  ggplot(aes(x = DATE, y = Diff)) +
+    geom_point() +
+    xlab("DATE") + ylab("Diff ET (mm or %)") + ggtitle("WS3 Old ET - WS3 Young ET")
+
+#Monthly comparison
+WS3_Comp_OET_ByMonth <- WS3_Comp_OET %>% 
+  mutate(Month = month(DATE)) %>% 
+  group_by(Month) %>% 
+  summarise(OldMon = mean(Old),
+            YoungMon = mean(Young)) %>% 
+  ungroup() %>% 
+  mutate(DiffMon = OldMon - YoungMon,
+         DiffPerMon = 100 * (OldMon - YoungMon)/OldMon) %>% 
+  ggplot(aes(x = Month, y = DiffMon)) +
+    geom_point() +
+    xlab("Month") + ylab("Diff ET (mm or %)") + ggtitle("WS3 Old ET - WS3 Young ET")
+
+#Plots
+print(WS3_Comp_OET_TS)
+# ggplotly(WS3_Comp_OET_TS)
+print(WS3_Comp_OET_ByMonth)
+# ggplotly(WS3_Comp_OET_ByMonth)
 
 ```
+
+
+
+
+
+
+
+
 
