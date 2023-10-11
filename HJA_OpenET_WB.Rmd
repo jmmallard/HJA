@@ -72,6 +72,7 @@ WSAnnData <- allData %>%
 
 Some plots of above
 ```{r WB_Plots}
+#Combine OpenET and WB residual data into one dataframe
 All_OpenET <- All_OpenET_raw %>% 
   select(WY = Year, 
          WS = WS,
@@ -80,19 +81,45 @@ All_OpenET <- All_OpenET_raw %>%
                         WS == 2 ~ "WS2_OET",
                         WS == 3 ~ "WS3_OET"))
 
-WBplot <- WSAnnData %>% 
+WB_both <- WSAnnData %>% 
   select(WY, WS1res, WS2res, WS3res) %>% 
   rename(WS1 = WS1res,
          WS2 = WS2res,
          WS3 = WS3res) %>% 
   gather(WS, ET, WS1, WS2, WS3) %>% 
   bind_rows(All_OpenET) %>% 
+  filter(WY >= 1999)
+
+#Time series of residuals and OpenET
+WBplot <- WB_both %>% 
   ggplot(aes(x = WY, y = ET, color = WS)) +
     geom_point() + xlab("Year") + ylab("P - Q or OpenET") 
   
-
 print(WBplot)
+
+#Summaries in box plots
+WB_both_groups <- WB_both %>% 
+  mutate(Est = case_when(WS %in% c("WS1", "WS2", "WS3") ~ "Res",
+                         TRUE ~ "OET")) %>% 
+  mutate(WS = case_when(WS == "WS1_OET" ~ "WS1",
+                        WS == "WS2_OET" ~ "WS2",
+                        WS == "WS3_OET" ~ "WS3",
+                        TRUE ~ WS))
+
+WBboxplot <- ggplot(WB_both_groups, aes(x = WS, y = ET, fill = Est)) +
+  geom_boxplot()
+
+print(WBboxplot)
+
 ```
+
+Playing around with the residual plotted in box plot above.
+Using AllData watershed data and WSX_All_OET
+```{r WBresidual}
+
+
+```
+
 
 Compare ET between riparian and total WS1
 ```{r Riparian Comparison}
@@ -106,7 +133,7 @@ WS1_Comp_OET <- WS1_All_OET %>%
 
 #Over the whole time series
 WS1_Comp_OET_TS <- WS1_Comp_OET %>% 
-  ggplot(aes(x = DATE, y = DiffPer)) +
+  ggplot(aes(x = DATE, y = Diff)) +
     geom_point() +
     xlab("DATE") + ylab("Diff ET (mm or %)") + ggtitle("WS1 All ET - WS1 Riparian ET")
 
@@ -119,15 +146,15 @@ WS1_Comp_OET_ByMonth <- WS1_Comp_OET %>%
   ungroup() %>% 
   mutate(DiffMon = AllMon - RipMon,
          DiffPerMon = 100 * (AllMon - RipMon)/AllMon) %>% 
-  ggplot(aes(x = Month, y = DiffMon)) +
+  ggplot(aes(x = Month, y = DiffPerMon)) +
     geom_point() +
     xlab("Month") + ylab("Diff ET (mm or %)") + ggtitle("WS1 All ET - WS1 Riparian ET")
 
 #Plots
 print(WS1_Comp_OET_TS)
-# ggplotly(WS1_Comp_OET_TS)  
+ggplotly(WS1_Comp_OET_TS)
 print(WS1_Comp_OET_ByMonth)
-# ggplotly(WS1_Comp_OET_ByMonth)
+ggplotly(WS1_Comp_OET_ByMonth)
 ```
 
 Compare time series of ET from OpenET derived from adjacent, same aspect patches of old and young growth forest
@@ -161,10 +188,69 @@ WS3_Comp_OET_ByMonth <- WS3_Comp_OET %>%
 
 #Plots
 print(WS3_Comp_OET_TS)
-# ggplotly(WS3_Comp_OET_TS)
+ggplotly(WS3_Comp_OET_TS)
 print(WS3_Comp_OET_ByMonth)
-# ggplotly(WS3_Comp_OET_ByMonth)
+ggplotly(WS3_Comp_OET_ByMonth)
 
+```
+Add OpenET estimates to Figure 5 from HJA_figures. For the time being this is just to panel A bc scales are comparable
+```{r OpenET2Figure5}
+#Get mean daily from monthly estimates OpenET
+# OET_Mean_Daily <- WS1_All_OET %>% 
+#   drop_na() %>% 
+#   mutate(Month = month(DATE)) %>% 
+#   group_by(Month) %>% 
+#   summarise(MeanMonthET = mean(ET)) %>% 
+#   ungroup() %>% 
+#   mutate(MeanDayET = MeanMonthET / 30) %>% 
+#   filter(Month %in% 5:8)
+# 
+# Fig5Amod <- HillslopeTransDefPlot + geom_point(OET_Mean_Daily, mapping = aes(x = Month, y = MeanDayET))
+# 
+# print(Fig5Amod)
+
+youngCol = "#4dac26"
+oldCol = "#a6611a"
+ripDefCol = "#01665e"
+hillDefCol = "#80cdc1"
+openETCol = "#bfbfbf"
+
+myCols = c(c("Young" = youngCol, "Old" = oldCol, "HillDef" = hillDefCol, "RipDef" = ripDefCol, "ET_OET"))
+
+myLineWidth = 2
+myTxtSz = 20
+
+#Put OpenET estimates in format so that it will display with sap flux estimates
+WS1_All_OET_month <- WS1_All_OET %>% 
+  filter(year(DATE) < 2023) %>% 
+  mutate(Month = month(DATE)) %>% 
+  group_by(Month) %>% 
+  summarise(Mean_Month_ET = mean(ET)/30)
+
+#Hillslope Transpiration Deficit with OpenET estimates on it
+Fig5Amod <- TransDef %>% 
+  select(DATE, transHillOld, transHillYoung, transDefHill) %>%
+  mutate(ET_OpenET = 
+    case_when(month(DATE) == 5 ~ WS1_All_OET_month$Mean_Month_ET[5],
+              month(DATE) == 6 ~ WS1_All_OET_month$Mean_Month_ET[6],
+              month(DATE) == 7 ~ WS1_All_OET_month$Mean_Month_ET[7],
+              month(DATE) == 8 ~ WS1_All_OET_month$Mean_Month_ET[8],
+              TRUE ~ 0)) %>% 
+  ggplot() +
+  geom_area(aes(x = DATE, y = transHillYoung, fill = "Young"),
+            alpha = 0.3) +
+  geom_area(aes(x = DATE, y = transHillOld, fill = "Old"),
+            alpha = 0.3) +
+  geom_area(aes(x = DATE, y = transDefHill, fill = "HillDef"),
+            alpha = 0.7) +
+  geom_area(aes(x = DATE, y = ET_OpenET, fill = "ET_OET"),
+            alpha = 0.3) +
+  theme_bw(base_size = myTxtSz) +
+  scale_x_date(expand = c(0,0)) +
+  labs(x = "", y = "Transpiration or ET (mm/d)") +
+  scale_fill_manual(name = "", values = myCols)
+
+print(Fig5Amod)
 ```
 
 
