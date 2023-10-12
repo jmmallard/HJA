@@ -216,4 +216,33 @@ ggplot(data = WS1LowFlow, aes(x = minQDoy, y = minQ))+
   labs(x = "7 day min day of year (mm)", y = "7 day min daily runoff (mm)")
 ```
 
+Look at trends in lowflow data for ref watersheds
+```{r AnnualTrendsLowFlow}
+lowFlowPlotRefWS <- WSLowFlowAnn %>% 
+  select(Year, WS2minQAug, WS9minQAug) %>% 
+  gather(WS, Aug30Low, WS2minQAug, WS9minQAug) %>% 
+  mutate(WS = case_when(WS == "WS2minQAug" ~ "WS2",
+                        WS == "WS9minQAug" ~ "WS9")) %>% 
+  ggplot(aes(x = Year, y = Aug30Low, color = WS)) +
+  geom_line()
+
+print(lowFlowPlotRefWS)
+print(lowFlowPlot)
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
