@@ -114,8 +114,32 @@ print(WBboxplot)
 ```
 
 Playing around with the residual plotted in box plot above.
-Using AllData watershed data and WSX_All_OET
+Using AllData watershed data and WS1_All_OET for WS1 monthly WB:
+- Precip and runoff from HJA data
+- ET from mean monthly OET estimate
+- Residual diff bn WS1 and WS2 for GW flux 
+```{r WB_WS1}
+#Monthly data from allData
+WS1_WB <- allData %>% 
+  select(DATE, precip, WS1, WS2) %>% 
+  
+  
+
+```
+
+What does the interannual variability in the residual look like?
 ```{r WBresidual}
+#Explore residual b/n WS1 and WS2
+WS1and2_Residual <- WSAnnData %>% 
+  select(WY, annP, annWS1, annWS2, WS1res, WS2res) %>% 
+  mutate(WS12resDiff = WS1res - WS2res) %>% 
+  filter(WY >= 1999)
+
+WS12resPlot <- WS1and2_Residual %>% 
+  ggplot(aes(x = WY, y = WS12resDiff)) +
+  geom_bar(stat = "identity")
+
+print(WS12resPlot)
 
 
 ```
