@@ -5,7 +5,6 @@ output: html_notebook
 
 Load packages
 ```{r LoadPackages}
-library(tidyverse)
 library(lubridate)
 library(ggplot2)
 library(zoo)
@@ -15,6 +14,7 @@ library(imputeTS)
 library(ggpubr)
 library(ggthemes)
 library(modelr)
+library(tidyverse)
 ```
 
 OpenET data
@@ -118,13 +118,45 @@ Using AllData watershed data and WS1_All_OET for WS1 monthly WB:
 - Precip and runoff from HJA data
 - ET from mean monthly OET estimate
 - Residual diff bn WS1 and WS2 for GW flux 
-```{r WB_WS1}
-#Monthly data from allData
-WS1_WB <- allData %>% 
-  select(DATE, precip, WS1, WS2) %>% 
-  
-  
 
+```{r WB_WS1}
+#Monthly data from allData for WS1
+WS1_mon_WB <- allData %>% 
+  select(DATE, precip, WS1) %>% 
+  mutate(Year = year(DATE),
+         Month = month(DATE)) %>% 
+  group_by(Year, Month) %>% 
+  summarise(WS1Mon = mean(WS1, na.rm = TRUE),
+            PrecipMon = mean(precip, na.rm = TRUE)) %>% 
+  ungroup() %>% 
+  mutate(Day = replicate(n = nrow(.), 1)) %>% 
+  mutate(DATE = make_date(Year, Month, Day)) %>% 
+  select(DATE, PrecipMon, WS1Mon, Year, Month)
+
+#Monthly mean ET for 
+WS1_mon_OET <- WS1_All_OET %>% 
+  drop_na() %>% 
+  mutate(Month = month(DATE)) %>% 
+  group_by(Month) %>% 
+  summarise(ETmon = mean(ET))
+
+#Annual residual for WS1 and WS2
+WS1_1and2_annRes <- allData %>% 
+  select(DATE, precip, WS1, WS2) %>% 
+  mutate(Year = year(DATE)) %>% 
+  group_by(Year) %>% 
+  summarise(PrecipAnn = sum(precip, na.rm = TRUE),
+            WS1Ann = sum(WS1, na.rm = TRUE),
+            WS2Ann = sum(WS2, na.rm = TRUE)) %>% 
+  ungroup() %>% 
+  mutate(WS1res = PrecipAnn - WS1Ann,
+         WS2res = PrecipAnn - WS2Ann) %>% 
+  mutate(WS1resDiffmon = (WS1res - WS2res)/12)
+
+#Combine all above into one df to make WB calculations
+WS1_WB <- WS1_mon_WB %>% 
+  merge(WS1_mon_OET, by = "Month")
+  
 ```
 
 What does the interannual variability in the residual look like?
@@ -140,8 +172,80 @@ WS12resPlot <- WS1and2_Residual %>%
   geom_bar(stat = "identity")
 
 print(WS12resPlot)
+```
 
+```{r MayAndWinPrecip}
+#Looking at May and climwate window precip
+MayPrecip <- allData %>% 
+  select(DATE, precip) %>% 
+  mutate(Month = month(DATE),
+         Year = year(DATE)) %>% 
+  filter(Month == 5) %>% 
+  group_by(Year) %>% 
+  summarise(MayP = sum(precip, na.rm = TRUE),
+            LenDat = length(precip),
+            LenNA = sum(is.na(precip))) %>% 
+  filter(LenDat > 29 & LenNA < 29) %>% 
+  select(-LenDat, -LenNA)
 
+#May 10 - June 10 precip. 
+#May 10 = day 131 in leap year, 130 otherwise
+#June 10 = day 162 in leap year, 161 otherwise
+WinPrecip <- allData %>% 
+  select(DATE, precip) %>% 
+  mutate(Year = year(DATE)) %>% 
+  mutate(InClimWin = case_when(leap_year(Year) & between(yday(DATE), 131, 162) ~ 1,
+                               !leap_year(Year) & between(yday(DATE), 130, 161) ~ 1,
+                               TRUE ~ 0)) %>% 
+  filter(InClimWin == 1) %>% 
+  group_by(Year) %>% 
+  summarise(WinP = sum(precip, na.rm = TRUE),
+            LenDat = length(precip),
+            LenNA = sum(is.na(precip))) %>% 
+  filter(LenDat > 29 & LenNA < 29) %>% 
+  select(-LenDat, -LenNA)
+
+MayWinPrecip <- merge(MayPrecip, WinPrecip, by = "Year")
+
+#Plots of above
+MayPrecipAllPlot <- MayWinPrecip %>% 
+  ggplot(aes(x = Year, y = MayP)) + 
+  geom_point() +
+  geom_smooth(method = "lm") +
+  theme_bw() + 
+  stat_cor(aes(label = after_stat(rr.label)), color = "red", geom = "label") +
+  labs(title = "May 1979 - 2018")
+
+WinPrecipAllPlot <- MayWinPrecip %>% 
+  ggplot(aes(x = Year, y = WinP)) + 
+  geom_point() +
+  geom_smooth(method = "lm") +
+  theme_bw() + 
+  stat_cor(aes(label = after_stat(rr.label)), color = "red", geom = "label") +
+  labs(title = "Window 1979 - 2018")
+
+MayPrecipNewPlot <- MayWinPrecip %>% 
+  filter(Year >= 1999) %>% 
+  ggplot(aes(x = Year, y = MayP)) + 
+  geom_point() +
+  geom_smooth(method = "lm") +
+  theme_bw() + 
+  stat_cor(aes(label = after_stat(rr.label)), color = "red", geom = "label") +
+  labs(title = "May 1999 - 2018")
+
+WinPrecipNewPlot <- MayWinPrecip %>% 
+  filter(Year >= 1999) %>% 
+  ggplot(aes(x = Year, y = WinP)) + 
+  geom_point() +
+  geom_smooth(method = "lm") +
+  theme_bw() + 
+  stat_cor(aes(label = after_stat(rr.label)), color = "red", geom = "label") +
+  labs(title = "Window 1999 - 2018")
+
+print(MayPrecipAllPlot)
+print(WinPrecipAllPlot)
+print(MayPrecipNewPlot)
+print(WinPrecipNewPlot)
 ```
 
 
