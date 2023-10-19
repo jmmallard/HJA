@@ -15,7 +15,6 @@ library(ggpubr)
 library(ggthemes)
 library(modelr)
 library(tidyverse)
-conflicted::conflict_prefer("select", "dplyr")
 ```
 
 OpenET data
@@ -127,12 +126,13 @@ WS1_mon_WB <- allData %>%
   mutate(Year = year(DATE),
          Month = month(DATE)) %>% 
   group_by(Year, Month) %>% 
-  summarise(WS1Mon = mean(WS1, na.rm = TRUE),
-            PrecipMon = mean(precip, na.rm = TRUE)) %>% 
+  summarise(WS1Mon = sum(WS1, na.rm = TRUE),
+            PrecipMon = sum(precip, na.rm = TRUE)) %>% 
   ungroup() %>% 
   mutate(Day = replicate(n = nrow(.), 1)) %>% 
   mutate(DATE = make_date(Year, Month, Day)) %>% 
-  select(DATE, PrecipMon, WS1Mon, Year, Month)
+  select(DATE, PrecipMon, WS1Mon, Year, Month) %>% 
+  filter(DATE >= ymd("1979-03-01") & DATE <= ymd("2018-09-01"))
 
 #Monthly mean ET for 
 WS1_mon_OET <- WS1_All_OET %>% 
@@ -158,11 +158,40 @@ WS1_1and2_annRes <- allData %>%
 WS1_WB <- WS1_mon_WB %>% 
   merge(WS1_mon_OET, by = "Month") %>% 
   drop_na() %>% 
+  arrange(DATE) %>% 
   left_join(., WS1_1and2_annRes %>% select(Year,WS1resDiffmon), by = "Year") %>% 
   select(-Month, -Year) %>% 
-  rename(Precip = PrecipMon, Runoff = WS1Mon, ET = ETmon, Res = WS1resDiffmon)
+  rename(Precip = PrecipMon, Runoff = WS1Mon, ET = ETmon, Res = WS1resDiffmon) %>% 
+  mutate(delS = Precip - Runoff - ET - Res,
+         delS_noRes = Precip - Runoff - ET) %>% 
+  mutate(cumS = cumsum(delS),
+         cumS_noRes = cumsum(delS_noRes))
   
 ```
+
+Plots of WS1 WB above
+```{r WB_WS1_plots}
+WS1_WB_plot <- WS1_WB %>% 
+  ggplot(aes(x = DATE, y = cumS)) +
+  geom_line()
+
+print(WS1_WB_plot)
+
+WS1_WB_noRes_plot <- WS1_WB %>% 
+  ggplot(aes(x = DATE, y = cumS_noRes)) +
+  geom_line()
+
+print(WS1_WB_noRes_plot)
+
+WS1_WB_both <- WS1_WB %>% 
+  gather(Res, S, cumS, cumS_noRes) %>% 
+  ggplot(aes(x = DATE, y = S, color = Res)) +
+  geom_line() +
+  labs(title = "Monthly WS1 WB: S = S(month-1) + P - Q - ET [- ResDiff(WS1-WS2)]")
+  
+print(WS1_WB_both)
+```
+
 
 What does the interannual variability in the residual look like?
 ```{r WBresidual}
