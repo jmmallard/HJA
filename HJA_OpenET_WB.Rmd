@@ -15,6 +15,7 @@ library(ggpubr)
 library(ggthemes)
 library(modelr)
 library(tidyverse)
+conflicted::conflict_prefer("select", "dplyr")
 ```
 
 OpenET data
@@ -155,7 +156,11 @@ WS1_1and2_annRes <- allData %>%
 
 #Combine all above into one df to make WB calculations
 WS1_WB <- WS1_mon_WB %>% 
-  merge(WS1_mon_OET, by = "Month")
+  merge(WS1_mon_OET, by = "Month") %>% 
+  drop_na() %>% 
+  left_join(., WS1_1and2_annRes %>% select(Year,WS1resDiffmon), by = "Year") %>% 
+  select(-Month, -Year) %>% 
+  rename(Precip = PrecipMon, Runoff = WS1Mon, ET = ETmon, Res = WS1resDiffmon)
   
 ```
 
