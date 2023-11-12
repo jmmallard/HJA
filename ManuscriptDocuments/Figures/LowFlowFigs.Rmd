@@ -32,21 +32,10 @@ Figure 1: Site map
 
 Figure 2: Hydro and climate data
 
-Figure 3: Hypothesis figures
-```{r HypothesisFigures}
-WS1Plot <- WS1Profile %>% 
-  mutate(SoilDepth = Elev_m - 2) %>% 
-  ggplot() +
-  geom_line(aes(x = Dist_m, y = Elev_m)) +
-  geom_line(aes(x = Dist_m, y = SoilDepth), color = "brown") +
-  theme_bw()
-  # theme(axis.text.x = element_blank(), axis.text.y = element_blank()) +
-  # labs(x = "", y = "")
+Figure 3: WS1 surplus and deficit 
+```{r}
 
-print(WS1Plot)
-ggsave("ManuscriptDocuments/Figures/WS1Profile.pdf", plot = WS1Plot)
 ```
-
 
 Figure 4: Window analysis
 

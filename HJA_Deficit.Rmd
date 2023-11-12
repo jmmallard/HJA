@@ -66,9 +66,19 @@ DefCompare <- allData %>%
                             Year > 1980 ~ "Pres")) %>% 
   merge(CalReg, by = "Month") %>% 
   mutate(WS1pred = WS2 * Slp + Int) %>% #Calculate predicted WS1 w/out treatment
-  mutate(WS1def = WS1 - WS1pred) #Calculate surplus or deficit
+  mutate(WS1def = WS1 - WS1pred) %>% #Calculate surplus or deficit
+  arrange(Year, Month)
   
-DefMonWS1Plot <- DefCompare %>% 
+DefMonWS1 <- DefCompare %>% 
+  select(Month, Period, WS1def) %>% 
+  group_by(Period, Month) %>% 
+  summarise(WS1def = mean(WS1def)) %>% 
+  mutate(WYMonth = case_when(Month >= 10 ~ Month - 9,
+                             Month < 10 ~ Month + 3)) %>% 
+  arrange(Period, WYMonth) %>% 
+  mutate(Month = factor(month.abb[Month], levels = c(month.abb[10:12], month.abb[1:9])))
+
+DefMonWS1Plot <- DefMonWS1 %>% 
   ggplot(aes(x = Month, y = WS1def, fill = Period)) +
   geom_bar(position = "dodge", stat = "identity")
 print(DefMonWS1Plot)
