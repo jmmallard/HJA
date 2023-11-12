@@ -82,6 +82,8 @@ DefMonWS1Plot <- DefMonWS1 %>%
   ggplot(aes(x = Month, y = WS1def, fill = Period)) +
   geom_bar(position = "dodge", stat = "identity")
 print(DefMonWS1Plot)
+
+save(DefMonWS1, file = "ManuscriptDocuments/Figures/FigureData/WS1_Month_Deficit.RData")
 ```
 
 Regression based on daily data

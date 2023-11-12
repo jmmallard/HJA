@@ -6,41 +6,40 @@ output:
 ---
 Load packages
 ```{r packages, message=FALSE, echo=FALSE, warning=FALSE}
-library(tidyverse)
 library(lubridate)
 library(ggplot2)
 library(zoo)
-library(climwin)
 library(plotly)
-library(imputeTS)
 library(ggpubr)
 library(ggthemes)
-library(modelr)
 library(tidyverse)
 ```
 
-Load data
-  - Transpiration deficit data
-```{r loadData, echo=FALSE}
-# load("../TransDef.RData") #If being knit
-load("TransDef.RData")
-WS1Profile <- read.csv("Data/WS01Profile.csv")
+Figure 1: Conceptual model
+
+Figure 2: Site map
+
+Figure 3: Hydro and climate data
+```{r Figure3-HydroAndClim}
+
 ```
 
 
-Figure 1: Site map
-
-Figure 2: Hydro and climate data
-
-Figure 3: WS1 surplus and deficit 
+Figure 4: WS1 surplus and deficit 
 ```{r}
 
 ```
 
-Figure 4: Window analysis
+Figure 5: Soil moisture/Riparian water table
 
-Figure 5: Transpiration deficit
-```{r TransDefFig}
+Figure 6: Window analysis
+
+Figure 7: Transpiration deficit
+```{r Figure7-TransDefFig}
+#Load Data
+load("TransDef.RData")
+
+#Set colors
 youngCol = "#4dac26"
 oldCol = "#a6611a"
 ripDefCol = "#01665e"
@@ -102,15 +101,6 @@ print(OverallTransDefPlot)
 
 ```
 
+Figure 8: Conceptual model revisited
 
-S1: Flow deficit
-
-S2: Digitized Moore data
-
-S3: Regressions b/n sap flux density and radiation/vpd
-
-S4: Riparian well time series
-
-S5: Hillslope well time series or soil volumetric content + porosity
-
-S6: Table of calculation values
+Table 1: Transpiration values
