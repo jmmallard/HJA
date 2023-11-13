@@ -13,7 +13,24 @@ soilWater <- soilWaterRaw %>%
   group_by(D, site) %>% 
   summarize(wp = mean(wp_kPa_50cm, na.rm = TRUE)) %>% 
   ungroup() %>% 
-  mutate(wpMA = rollmean(wp, 1, fill = NA))
+  mutate(wpMA = rollmean(wp, 7, fill = NA))
+
+save(soilWater, file = "ManuscriptDocuments/Figures/FigureData/SoilWater.RData")
+
+soilWPPlot <- soilWater %>% 
+  ggplot(aes(x = D, y = wp, group = site)) +
+  geom_line(size = 0.5, color = "steelblue")
+print(soilWPPlot)
+
+soilWaterPotential <- ggplot(data = soilWater[!is.na(soilWater$wpMA),],
+                             aes(x = D, y = wp, group = site)) +
+  geom_line(size = 0.5, color = "steelblue") +
+  scale_y_continuous(expand = c(0,0)) +
+  scale_x_date(date_labels = "%b-%y", expand = c(0,0)) +
+  coord_cartesian(ylim = c(-100000, -7)) +
+  labs(x = "", y = "WP, 50 cm (kPa)") +
+  theme_bw(base_size = 20)
+print(soilWaterPotential)
 
 # soilWaterPlot1 <- ggplot(data = soilWater, aes(x = DT, y = wp_kPa_50cm, group = site)) +
 #   geom_line() +
@@ -34,15 +51,6 @@ soilWater <- soilWaterRaw %>%
 
 # print(soilWaterPlot)
 
-soilWaterPotential <- ggplot(data = soilWater[!is.na(soilWater$wpMA),],
-                             aes(x = D, y = wpMA, group = site)) +
-  geom_line(size = 0.5, color = "steelblue") +
-  scale_y_continuous(expand = c(0,0)) +
-  scale_x_date(date_labels = "%b-%y", expand = c(0,0)) +
-  coord_cartesian(ylim = c(-100000, -7)) +
-  labs(x = "", y = "WP, 50 cm (kPa)") +
-  theme_bw(base_size = 20)
-ggplotly(soilWaterPotential)
 ```
 
 Sites where low flow studies have been done
@@ -131,6 +139,8 @@ precipPlot <- precipData %>%
   labs(x = "", y = "Precip (mm/mon)")
 
 print(precipPlot)
+
+save(list = c("allHydgrfData", "meanHydgrfData", "precipData"), file = "ManuscriptDocuments/Figures/FigureData/ClimAndHydData.RData")
 
 ```
 

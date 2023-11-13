@@ -275,7 +275,7 @@ print(modelPlot)
 Filter models to only those greater than some length of time and look at box plots and tile plots of top X open and close windows. Visualize these results with boxplots and tile plots.
 ```{r TopModels}
 #inputs
-winLength <- 7 #number of days of minimum window
+winLength <- 14 #number of days of minimum window
 numTopModels <- 40 #top number of models as ranked by AIC to plot
 
 #Pre-allocate data frame
@@ -345,8 +345,12 @@ for (i in 1:nrow(tileTopModels)) {
   tileTopModels$nModDay[i] <- nrow(tempTopClimModels)
 }
 
+tileTopModels$winDay <- winDays2Dates(tileTopModels$winDay) #Convert window days into actual dates
+
+save(tileTopModels, file = "ManuscriptDocuments/Figures/FigureData/ClimWinTile.RData")
+
 tilePlots <- tileTopModels %>% 
-  ggplot(aes(x = winDays2Dates(winDay), y = WS, fill = nModDay)) +
+  ggplot(aes(x = winDay, y = WS, fill = nModDay)) +
   geom_tile() + facet_wrap(~ climVar) +
   labs( # title = paste("Top ", numTopModels, " models explaining Aug 30 low flow"),
        x = "Open and close days",

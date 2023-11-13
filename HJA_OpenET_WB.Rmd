@@ -355,6 +355,7 @@ print(WS3_Comp_OET_ByMonth)
 ggplotly(WS3_Comp_OET_ByMonth)
 
 ```
+
 Add OpenET estimates to Figure 5 from HJA_figures. For the time being this is just to panel A bc scales are comparable
 ```{r OpenET2Figure5}
 #Get mean daily from monthly estimates OpenET
@@ -377,7 +378,7 @@ ripDefCol = "#01665e"
 hillDefCol = "#80cdc1"
 openETCol = "#bfbfbf"
 
-myCols = c(c("Young" = youngCol, "Old" = oldCol, "HillDef" = hillDefCol, "RipDef" = ripDefCol, "ET_OET"))
+myCols = c(c("Young" = youngCol, "Old" = oldCol, "HillDef" = hillDefCol, "RipDef" = ripDefCol, "ET_OET" = openETCol))
 
 myLineWidth = 2
 myTxtSz = 20
@@ -388,6 +389,8 @@ WS1_All_OET_month <- WS1_All_OET %>%
   mutate(Month = month(DATE)) %>% 
   group_by(Month) %>% 
   summarise(Mean_Month_ET = mean(ET)/30)
+
+save(WS1_All_OET_month, file = "ManuscriptDocuments/Figures/FigureData/OETMonthly.RData")
 
 #Hillslope Transpiration Deficit with OpenET estimates on it
 Fig5Amod <- TransDef %>% 

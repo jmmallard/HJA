@@ -15,44 +15,158 @@ library(ggthemes)
 library(tidyverse)
 ```
 
+Common figure characteristics
+```{r}
+#File path to figure data
+FigDataPath = "ManuscriptDocuments/Figures/FigureData/"
+
+#Default text size
+myTxtSz = 20
+```
+
 Figure 1: Conceptual model
 
 Figure 2: Site map
 
 Figure 3: Hydro and climate data
 ```{r Figure3-HydroAndClim}
+#Load Data from HJA_ICRW8_figs
+load(paste(FigDataPath,"ClimAndHydData.RData", sep = ""))
+
+#Panel A: Precip Plot
+Fig3a <- precipData %>% 
+  mutate(WYMonth = c(4:12,1:3)) %>% 
+  arrange(WYMonth) %>% 
+  mutate(precipMonth = factor(month.abb[precipMonth], levels = c(month.abb[10:12], month.abb[1:9]))) %>% 
+  ggplot() +
+  geom_bar(aes(x = precipMonth, y = meanPrecip), fill = "steelblue", stat = "identity") +
+  geom_errorbar(aes(x = precipMonth, ymin = lowPrecip, ymax = upPrecip),
+                width = 0.2) +
+  scale_x_discrete(expand = c(0,0)) +
+  scale_y_continuous(expand = c(0,0)) +
+  coord_cartesian(ylim = c(0, 500)) +
+  theme_bw(base_size = 20) +
+  theme(panel.grid.minor = element_blank(),
+        panel.grid.major = element_blank()) +
+  labs(x = "", y = "Precip (mm/mon)")
+print(Fig3a)
+
+#Panel B: Hydrograph Plot
+Fig3b <- ggplot() + 
+  geom_line(data = allHydgrfData, aes(x = DATE2, y = WS2, group = WY), color = "#d9d9d9") +
+  geom_line(data = meanHydgrfData, aes(x = DATE2, y = meanWS2), linewidth = 1.5, color = "#2b8cbe") +
+  theme_bw(base_size = 20) + 
+  theme(panel.grid.minor = element_blank(),
+        panel.grid.major = element_blank()) +
+  labs(x = "", y = "Runoff (mm/d)") +
+  scale_x_date(expand = c(0,0),
+               date_labels = "%b") +
+  scale_y_continuous(expand = c(0,0)) +
+  coord_cartesian(ylim = c(-1, 160))
+print(Fig3b)
 
 ```
-
 
 Figure 4: WS1 surplus and deficit 
-```{r}
+```{r Figure4-Deficit}
+#Load data from HJA_Deficit
+load(paste(FigDataPath,"WS1_Month_Deficit.RData", sep = ""))
 
+#Set colors
+Post = "#1f78b4"
+Pres = "#33a02c"
+
+myCols = c(c("Post" = Post, "Pres" = Pres))
+
+#Figure 4
+Fig4 <- DefMonWS1 %>% 
+  ggplot(aes(x = Month, y = WS1def, fill = Period)) +
+  geom_bar(position = "dodge", stat = "identity") +
+  geom_hline(yintercept = 0) +
+  theme_bw(base_size = 20) + 
+  labs(x = "", y = "\u0394 Runoff (mm/mon)") +
+  scale_fill_manual(values = c(Post, Pres))
+print(Fig4)
 ```
 
-Figure 5: Soil moisture/Riparian water table
+Figure 5: Window analysis
+```{r Figure5-ClimWin}
+#Load Data from HJAClimWin
+load(paste(FigDataPath,"ClimWinTile.RData", sep = ""))
 
-Figure 6: Window analysis
+#Panel A and B together
+Fig5 <- tileTopModels %>% 
+  filter(WS != "WS3") %>% 
+  ggplot(aes(x = winDay, y = WS, fill = nModDay)) +
+  geom_tile() + facet_wrap(~ climVar) +
+  theme_bw(base_size = myTxtSz) +
+  labs(x = "Window open or close day",
+       y = "",
+       fill = "n(Win)"
+       ) +
+  scale_x_date(expand = c(0,0), date_labels = "%b %e")
+
+  
+print(Fig5)
+```
+
+Figure 6: Soil moisture/Riparian water table
+```{r Figure6-SoilMoisture}
+#Load Data from HJA_ICRW8_figs
+load(paste(FigDataPath,"SoilWater.RData", sep = ""))
+
+#Panel A: Hillslope soil moisture
+Fig6a <- soilWater %>% 
+  ggplot(aes(x = D, y = wp, group = site)) + 
+  geom_line(size = 0.5, color = "steelblue") +
+  scale_y_continuous(expand = c(0,0)) +
+  scale_x_date(date_labels = "%b-%y", expand = c(0,0)) +
+  coord_cartesian(ylim = c(-75, 0)) +
+  labs(x = "", y = "WP, 50 cm (kPa)") +
+  theme_bw(base_size = myTxtSz)
+  
+print(Fig6a)
+```
 
 Figure 7: Transpiration deficit
 ```{r Figure7-TransDefFig}
-#Load Data
-load("TransDef.RData")
+#Load Data from HJA_ET_fromMoore2004
+load(paste(FigDataPath,"TransDef.RData", sep = ""))
+#Load Data from HJA_OpenET_WB
+load(paste(FigDataPath,"OETMonthly.RData", sep = ""))
 
 #Set colors
 youngCol = "#4dac26"
 oldCol = "#a6611a"
 ripDefCol = "#01665e"
 hillDefCol = "#80cdc1"
+openETCol = "#bfbfbf"
 
-myCols = c(c("Young" = youngCol, "Old" = oldCol, "HillDef" = hillDefCol, "RipDef" = ripDefCol))
+myCols = c(c("Young" = youngCol, "Old" = oldCol, "HillDef" = hillDefCol, "RipDef" = ripDefCol, "ET_OET" = openETCol))
 
 myLineWidth = 2
 myTxtSz = 20
 
-#Hillslope Transpiration Deficit
-HillslopeTransDefPlot <- TransDef %>% 
-  select(DATE, transHillOld, transHillYoung, transDefHill) %>% 
+#Add OpenET estimates to TransDef and rescale OpenET estimates to hillslope and riparian areas (ha)
+ATot = 96
+ARip = 2.18
+AHill = ATot - ARip
+
+TransOET <- TransDef %>% 
+  select(DATE, transHillOld, transHillYoung, transDefHill,
+         transRipOld, transRipYoung, transDefRip) %>%
+  mutate(ET_OpenET = 
+    case_when(month(DATE) == 5 ~ WS1_All_OET_month$Mean_Month_ET[5],
+              month(DATE) == 6 ~ WS1_All_OET_month$Mean_Month_ET[6],
+              month(DATE) == 7 ~ WS1_All_OET_month$Mean_Month_ET[7],
+              month(DATE) == 8 ~ WS1_All_OET_month$Mean_Month_ET[8],
+              TRUE ~ 0)) %>% 
+  mutate(ET_OET_Rip = ET_OpenET * ARip/ATot,
+         ET_OET_Hill = ET_OpenET * AHill/ATot)
+
+#Panel A: Hillslope Transpiration Deficit
+Fig7a <- TransOET %>% 
+  select(DATE, transHillOld, transHillYoung, transDefHill, ET_OET_Hill) %>% 
   ggplot() +
   geom_area(aes(x = DATE, y = transHillYoung, fill = "Young"), 
             alpha = 0.3) + 
@@ -60,15 +174,17 @@ HillslopeTransDefPlot <- TransDef %>%
             alpha = 0.3) +
   geom_area(aes(x = DATE, y = transDefHill, fill = "HillDef"), 
             alpha = 0.7) +
+   geom_area(aes(x = DATE, y = ET_OET_Hill, fill = "ET_OET"),
+            alpha = 0.4) +
   theme_bw(base_size = myTxtSz) +
   scale_x_date(expand = c(0,0)) +
-  labs(x = "", y = "Transpiration (mm/d)") +
+  labs(x = "", y = "Transpiration or ET (mm/d)") +
   scale_fill_manual(name = "", values = myCols)
 print(HillslopeTransDefPlot)
 
-#Riparian Transpiration Deficit
-RiparianTransDefPlot <- TransDef %>% 
-  select(DATE, transRipOld, transRipYoung, transDefRip) %>% 
+#Panel B: Riparian Transpiration Deficit
+Fig7b <- TransOET %>% 
+  select(DATE, transRipOld, transRipYoung, transDefRip, ET_OET_Rip) %>% 
   ggplot() +
   geom_area(aes(x = DATE, y = transRipYoung, fill = "Young"), 
             alpha = 0.3) + 
@@ -76,16 +192,18 @@ RiparianTransDefPlot <- TransDef %>%
             alpha = 0.3) +
   geom_area(aes(x = DATE, y = transDefRip, fill = "RipDef"),
             alpha = 0.7) +
+  geom_area(aes(x = DATE, y = ET_OET_Rip, fill = "ET_OET"),
+            alpha = 0.4) +
   theme_bw(base_size = myTxtSz) +
   scale_x_date(expand = c(0,0)) +
-  labs(x = "", y = "Transpiration (mm/d)") +
+  labs(x = "", y = "Transpiration or ET (mm/d)") +
   scale_fill_manual(name = "", values = myCols)
 print(RiparianTransDefPlot)
 
-#Overall Transpiration Deficit
+#Panel C: Overall Transpiration Deficit
 myCols = c(Rip = ripDefCol, Hill = hillDefCol)
 
-OverallTransDefPlot <- TransDef %>% 
+Fig7c <- TransOET %>% 
   select(DATE, transDefRip, transDefHill) %>% 
   mutate(Rip = cumsum(transDefRip),
          Hill = cumsum(transDefHill)) %>% 
@@ -94,7 +212,7 @@ OverallTransDefPlot <- TransDef %>%
   ggplot(aes(x = DATE, y = sumTrans, fill = Position)) +
   geom_area(alpha = 0.7) +
   scale_fill_manual(name = "", values = myCols) +
-   theme_bw(base_size = myTxtSz) +
+  theme_bw(base_size = myTxtSz) +
   scale_x_date(expand = c(0,0)) +
   labs(x = "", y = "\u03A3 Transpiration (mm)")
 print(OverallTransDefPlot)  
