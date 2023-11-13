@@ -65,6 +65,21 @@ Fig3b <- ggplot() +
   coord_cartesian(ylim = c(-1, 160))
 print(Fig3b)
 
+#Panel B inset
+Fig3bInset <- ggplot() +
+  geom_line(data = allHydgrfData, aes(x = DATE2, y = WS2, group = WY), color = "#d9d9d9") +
+  geom_line(data = meanHydgrfData, aes(x = DATE2, y = meanWS2), linewidth = 1.5, color = "#2b8cbe") +
+  theme_bw(base_size = 40) + 
+  theme(panel.grid.minor = element_blank(),
+        panel.grid.major = element_blank()) +
+  labs(x = "", y = "") +
+  scale_x_date(expand = c(0,0),
+               date_labels = "%b") +
+  scale_y_continuous(expand = c(0,0)) +
+  coord_cartesian(xlim = as.Date(c("2100-06-01", "2100-09-30")),
+                  ylim = c(0.1, 3))
+print(Fig3bInset)
+
 ```
 
 Figure 4: WS1 surplus and deficit 
@@ -84,6 +99,8 @@ Fig4 <- DefMonWS1 %>%
   geom_bar(position = "dodge", stat = "identity") +
   geom_hline(yintercept = 0) +
   theme_bw(base_size = 20) + 
+  theme(panel.grid.minor = element_blank(),
+        panel.grid.major = element_blank()) +
   labs(x = "", y = "\u0394 Runoff (mm/mon)") +
   scale_fill_manual(values = c(Post, Pres))
 print(Fig4)
@@ -106,7 +123,6 @@ Fig5 <- tileTopModels %>%
        ) +
   scale_x_date(expand = c(0,0), date_labels = "%b %e")
 
-  
 print(Fig5)
 ```
 
@@ -120,7 +136,7 @@ Fig6a <- soilWater %>%
   ggplot(aes(x = D, y = wp, group = site)) + 
   geom_line(size = 0.5, color = "steelblue") +
   scale_y_continuous(expand = c(0,0)) +
-  scale_x_date(date_labels = "%b-%y", expand = c(0,0)) +
+  scale_x_date(date_labels = "%b", expand = c(0,0)) +
   coord_cartesian(ylim = c(-75, 0)) +
   labs(x = "", y = "WP, 50 cm (kPa)") +
   theme_bw(base_size = myTxtSz)
@@ -128,8 +144,10 @@ Fig6a <- soilWater %>%
 print(Fig6a)
 ```
 
-Figure 7: Transpiration deficit
-```{r Figure7-TransDefFig}
+Figure 7: Riparian Water Table
+
+Figure 8: Transpiration deficit
+```{r Figure8-TransDefFig}
 #Load Data from HJA_ET_fromMoore2004
 load(paste(FigDataPath,"TransDef.RData", sep = ""))
 #Load Data from HJA_OpenET_WB
@@ -219,6 +237,6 @@ print(OverallTransDefPlot)
 
 ```
 
-Figure 8: Conceptual model revisited
+Figure 9: Conceptual model revisited
 
 Table 1: Transpiration values

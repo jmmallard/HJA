@@ -126,8 +126,8 @@ precipData <- allData %>%
   ungroup() %>% 
   group_by(precipMonth) %>% 
   summarise(meanPrecip = mean(monPrecip, na.rm = TRUE),
-            upPrecip = quantile(monPrecip, 0.95, na.rm = TRUE),
-            lowPrecip = quantile(monPrecip, 0.05, na.rm = TRUE))
+            upPrecip = quantile(monPrecip, 0.75, na.rm = TRUE),
+            lowPrecip = quantile(monPrecip, 0.25, na.rm = TRUE))
 
 precipPlot <- precipData %>% 
   mutate(WYMonth = c(4:12,1:3)) %>% 
