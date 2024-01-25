@@ -7,7 +7,6 @@ output:
 
 Load packages
 ```{r LoadPackages}
-library(tidyverse)
 library(lubridate)
 library(ggplot2)
 library(zoo)
@@ -17,6 +16,7 @@ library(imputeTS)
 library(ggpubr)
 library(ggthemes)
 library(modelr)
+library(tidyverse)
 ```
 Attempts to leverage data from Moore et al 2004 study on transpiration at HJA WS1 and 2
 
@@ -463,9 +463,9 @@ lmPSMEyRadVpd <- lm(PSMEy ~ Rad + Vpd, data = sapFluxEx)
 # lmTSHEoRad <- lm(TSHEo ~ Rad, data = sapFluxEx)
 lmTSHEoRadVpd <- lm(TSHEo ~ Rad + Vpd, data = sapFluxEx)
 
-summary(lmPSMEoVpd)
-summary(lmPSMEoRad)
-summary(lmPSMEoRadVpd)
+# summary(lmPSMEoVpd)
+# summary(lmPSMEoRad)
+# summary(lmPSMEoRadVpd)
 # summary(lmPSMEyVpd)
 # summary(lmPSMEyRad)
 # summary(lmPSMEyRadVpd)
@@ -614,6 +614,69 @@ sum(TransDef$transDefHill)
 sum(TransDef$transDefHill[between(TransDef$DATE, as.Date("2000-05-09"), as.Date("2000-06-10"))])
 sum(TransDef$transDefRip)
 sum(TransDef$transDef)
+```
+```{r AGU23 Trans Figure}
+#Set colors
+youngCol = "#4dac26"
+oldCol = "#a6611a"
+ripDefCol = "#01665e"
+
+myCols = c(c("Young" = youngCol, "Old" = oldCol, "RipDef" = ripDefCol))
+
+myLineWidth = 2
+myTxtSz = 20
+
+#Add OpenET estimates to TransDef and rescale OpenET estimates to hillslope and riparian areas (ha)
+ATot = 96
+ARip = 2.18
+AHill = ATot - ARip
+
+TransOET <- TransDef %>% 
+  select(DATE, transHillOld, transHillYoung, transDefHill,
+         transRipOld, transRipYoung, transDefRip) %>%
+  mutate(ET_OpenET = 
+    case_when(month(DATE) == 5 ~ WS1_All_OET_month$Mean_Month_ET[5],
+              month(DATE) == 6 ~ WS1_All_OET_month$Mean_Month_ET[6],
+              month(DATE) == 7 ~ WS1_All_OET_month$Mean_Month_ET[7],
+              month(DATE) == 8 ~ WS1_All_OET_month$Mean_Month_ET[8],
+              TRUE ~ 0)) %>% 
+  mutate(ET_OET_Rip = ET_OpenET * ARip/ATot,
+         ET_OET_Hill = ET_OpenET * AHill/ATot)
+
+#Riparian Transpiration Deficit without deficit
+AGUFig <- TransOET %>% 
+  select(DATE, transRipOld, transRipYoung, transDefRip) %>% 
+  ggplot() +
+  geom_area(aes(x = DATE, y = transRipYoung, fill = "Young"), 
+            alpha = 0.3) + 
+  geom_area(aes(x = DATE, y = transRipOld, fill = "Old"), 
+            alpha = 0.3) +
+  geom_area(aes(x = DATE, y = transDefRip, fill = "RipDef"),
+            alpha = 0.7) +
+  theme_classic(base_size = myTxtSz) +
+  theme(panel.border = element_rect(fill=NA)) +
+  scale_fill_manual(name = "", values = myCols) +
+  labs(x = "", y = bquote("Transpiration (mm" ~d^-1*")")) +
+  scale_x_date(expand = c(0,0))
+print(AGUFig)
+
+# #Panel C: Overall Transpiration Deficit
+# myCols = c(Rip = ripDefCol, Hill = hillDefCol)
+# 
+# Fig7c <- TransOET %>% 
+#   select(DATE, transDefRip, transDefHill) %>% 
+#   mutate(Rip = cumsum(transDefRip),
+#          Hill = cumsum(transDefHill)) %>% 
+#   select(-c(transDefRip, transDefHill)) %>% 
+#   gather(Position, sumTrans, Rip, Hill) %>% 
+#   ggplot(aes(x = DATE, y = sumTrans, fill = Position)) +
+#   geom_area(alpha = 0.7) +
+#   scale_fill_manual(name = "", values = myCols) +
+#   theme_bw(base_size = myTxtSz) +
+#   scale_x_date(expand = c(0,0)) +
+#   labs(x = "", y = "\u03A3 Transpiration (mm)")
+# print(OverallTransDefPlot)  
+
 ```
 
 

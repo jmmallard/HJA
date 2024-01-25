@@ -44,7 +44,7 @@ CalReg <- CalData %>%
 #   lm(WS1 ~ WS2, data = .)
 ```
 
-Select two time periods and compare monthly mean deficit/surplus
+Select two time periods and compare observed to monthly mean deficit/surplus using regression coefficients calculated above
 ```{r PostVsPresent}
 PostStartWY = 1967
 PostEndWY = 1971
