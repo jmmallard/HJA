@@ -9,6 +9,7 @@ Using WS1 and WS2 data to calculate flow deficits in WS1
 library(tidyverse)
 library(lubridate)
 library(broom)
+library(zoo)
 ```
 
 Regression calibrations based on monthly data
@@ -85,6 +86,61 @@ print(DefMonWS1Plot)
 
 save(DefMonWS1, file = "ManuscriptDocuments/Figures/FigureData/WS1_Month_Deficit.RData")
 ```
+Calculate growing season deficit for current period. Using "DefCompare" from above
+```{r GrowingSeasonDeficit}
+GrowStart = 5 #Months of start and end of growing season
+GrowEnd = 8 
+
+GrowDef <- DefCompare %>% 
+  filter(Period == "Pres") %>% 
+  select(Month, WS1def) %>% 
+  filter(between(Month, GrowStart, GrowEnd)) %>% 
+  group_by(Month) %>% 
+  summarise(meanDef = mean(WS1def))
+
+print(sum(GrowDef$meanDef))
+  
+```
+
+Look at growing season deficit in every 5 yr period from 2000 - 2019
+```{r GSDeficitPost2000}
+StartWY = 2000
+EndWY = 2019
+
+StartGS = 5
+EndGS = 8
+
+DefPost2000 <- allData %>% 
+  select(DATE, WY, WS1, WS2) %>% 
+  arrange(DATE) %>% 
+  filter(between(WY, StartWY, EndWY)) %>% 
+  mutate(Month = month(DATE),
+         Year = year(DATE)) %>%
+  group_by(WY, Month) %>% 
+  summarise(WS1 = sum(WS1),
+            WS2 = sum(WS2)) %>% 
+  ungroup() %>% 
+  merge(CalReg, by = "Month") %>% 
+  mutate(WS1pred = WS2 * Slp + Int) %>% #Calculate predicted WS1 w/out treatment
+  mutate(WS1def = WS1 - WS1pred) #Calculate surplus or deficit
+
+GSDefPost2000 <- DefPost2000 %>% 
+  filter(between(Month, StartGS, EndGS)) %>% 
+  group_by(WY) %>% 
+  summarise(GSDef = sum(WS1def))
+
+GSDefPost2000Plot <- GSDefPost2000 %>% 
+  ggplot(aes(x = WY, y = GSDef)) + 
+  geom_bar(position = "dodge", stat = "identity") +
+  geom_line(size = 2, 
+           data = GSDefPost2000 %>% 
+              mutate(GSDef = rollmean(GSDef, 5, align = "center", fill = NA)),
+            size = 2) +
+  theme_bw() +
+  scale_y_continuous(expand = expand_scale(mult = c(0.05, 0)))
+print(GSDefPost2000Plot)
+```
+
 
 Regression based on daily data
 ```{r DayRegression}
