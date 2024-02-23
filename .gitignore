@@ -1,8 +1,10 @@
 .Rproj.user
 .Rhistory
-.RData
+*.RData
 .Ruserdata
 .DS_Store
+*.docx
+*.xlsx
 Data
 TransDef.RData
 WorkingData.RData
