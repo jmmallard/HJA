@@ -15,7 +15,7 @@ library(zoo)
 Regression calibrations based on monthly data
 ```{r MonthRegression}
 CalStartWY = 1953
-CalEndWY = 1961
+CalEndWY = 1962
 
 CalData <- allData %>% 
   select(DATE, WY, WS1, WS2) %>% 
@@ -141,73 +141,4 @@ GSDefPost2000Plot <- GSDefPost2000 %>%
   labs(x = "Water Year", y = "May - August Deficit (mm)")
 print(GSDefPost2000Plot)
 ```
-
-
-Regression based on daily data
-```{r DayRegression}
-CalStartWY = 1953
-CalEndWY = 1961
-
-CalDataDaily <- allData %>% 
-  select(DATE, WY, WS1, WS2) %>% 
-  arrange(DATE) %>% 
-  filter(between(WY, CalStartWY, CalEndWY)) %>% 
-  filter(!(month(DATE) == 2 & day(DATE) == 29)) %>% 
-  mutate(DoWY = rep(1:365, 9))
-
-CalRegDaily <-CalDataDaily %>% 
-  select(DoWY, WS1, WS2) %>% 
-  nest(Data = -DoWY) %>% 
-  mutate(Fit = map(Data, ~ lm(WS1 ~ WS2, data = .x))) %>% 
-  mutate(RegPar = map(Fit, tidy)) %>% 
-  unnest(RegPar) %>% 
-  mutate(term = case_when(term == "(Intercept)" ~ "Int",
-                          TRUE ~ "Slp")) %>% 
-  select(DoWY, term, estimate) %>% 
-  spread(term, estimate)
-  
-```
-
-Compare Post and Present using daily regressions
-```{r PostVsPresDaily}
-PostStartWY = 1967
-PostEndWY = 1971
-PresStartWY = 2015
-PresEndWY = 2019
-
-DefCompareDaily <- allData %>% 
-  select(DATE, WY, WS1, WS2) %>% 
-  arrange(DATE) %>% 
-  filter(between(WY, PostStartWY, PostEndWY) |
-           between(WY, PresStartWY, PresEndWY)) %>% 
-  mutate(Month = month(DATE),
-         Year = year(DATE),
-         Period = case_when(between(WY, PostStartWY, PostEndWY) ~ "Post",
-                            between(WY, PresStartWY, PresEndWY) ~ "Pres")) %>% 
-  group_by(Period, Month) %>% 
-  summarise(WS1 = mean(WS1),
-            WS2 = mean(WS2)) %>% 
-  ungroup() %>% 
-  merge(CalReg, by = "Month") %>% 
-  mutate(WS1pred = WS2 * Slp + Int) %>% #Calculate predicted WS1 w/out treatment
-  mutate(WS1def = WS1 - WS1pred) #Calculate surplus or deficit
-
-```
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
