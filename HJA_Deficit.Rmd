@@ -198,4 +198,3 @@ print(WS1QChange5YrMonPlot)
   
 save(WS1QChange5YrMon, file = "ManuscriptDocuments/Figures/FigureData/WS1_Month_Deficit.RData")
 ```
-

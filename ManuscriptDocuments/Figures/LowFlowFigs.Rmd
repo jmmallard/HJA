@@ -89,20 +89,27 @@ load(paste(FigDataPath,"WS1_Month_Deficit.RData", sep = ""))
 
 #Set colors
 Post = "#1f78b4"
-Pres = "#33a02c"
+Pres1 = "#33a02c"
+Pres2 = "#a6cee3"
+Pres3 = "#fb9a99"
+Pres4 = "#b2df8a"
 
-myCols = c(c("Post" = Post, "Pres" = Pres))
+myCols = c("Post" = Post, 
+           "Pres1" = Pres1,
+           "Pres2" = Pres2,
+           "Pres3" = Pres3,
+           "Pres4" = Pres4)
 
 #Figure 4
-Fig4 <- DefMonWS1 %>% 
-  ggplot(aes(x = Month, y = WS1def, fill = Period)) +
+Fig4 <- WS1QChange5YrMon %>% 
+  ggplot(aes(x = Month, y = WS1dif, fill = Period)) +
   geom_bar(position = "dodge", stat = "identity") +
   geom_hline(yintercept = 0) +
-  theme_bw(base_size = 20) + 
+  theme_bw(base_size = 18) + 
   theme(panel.grid.minor = element_blank(),
         panel.grid.major = element_blank()) +
   labs(x = "", y = "\u0394 Runoff (mm/mon)") +
-  scale_fill_manual(values = c(Post, Pres))
+  scale_fill_manual(values = c(Post, Pres1, Pres2, Pres3, Pres4))
 print(Fig4)
 ```
 
