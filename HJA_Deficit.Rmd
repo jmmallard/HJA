@@ -178,13 +178,16 @@ WS1QChange5Yr <- allData %>%
   merge(CalReg, by = "Month") %>%
   arrange(WY, Month) %>% 
   mutate(WS1pred = WS2 * Slp + Int) %>% #Calculate predicted WS1 w/out treatment
-  mutate(WS1dif = WS1 - WS1pred) #Calculate surplus or deficit
+  mutate(WS1dif = WS1 - WS1pred) %>% #Calculate surplus or deficit
+  mutate(WS1RelDif = WS1dif/WS1)
 
 #Average by month for each five year period
 WS1QChange5YrMon <- WS1QChange5Yr %>% 
-  select(Period, WY, Month, WS1dif) %>% 
+  select(Period, WY, Month, WS1, WS1dif, WS1RelDif) %>% 
   group_by(Period, Month) %>% 
-  summarise(WS1dif = mean(WS1dif)) %>% 
+  summarise(WS1 = mean(WS1),
+            WS1dif = mean(WS1dif),
+            WS1RelDif = mean(WS1RelDif)) %>% 
   mutate(WYMonth = case_when(Month >= 10 ~ Month - 9,
                              Month < 10 ~ Month + 3)) %>% 
   arrange(Period, WYMonth) %>% 
@@ -197,4 +200,13 @@ WS1QChange5YrMonPlot <- WS1QChange5YrMon %>%
 print(WS1QChange5YrMonPlot)
   
 save(WS1QChange5YrMon, file = "ManuscriptDocuments/Figures/FigureData/WS1_Month_Deficit.RData")
+
+#Four growing season deficits for post 2000
+WS1QChange5YrGS <- WS1QChange5YrMon %>% 
+  filter(between(WYMonth, 8, 11)) %>% 
+  group_by(Period) %>% 
+  summarize(GSDef = sum(WS1dif),
+            GSQ = sum(WS1)) %>% 
+  mutate(GSRelDef = GSDef/GSQ)
+           
 ```

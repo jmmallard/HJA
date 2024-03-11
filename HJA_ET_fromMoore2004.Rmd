@@ -610,8 +610,10 @@ RiparianTransDefPlot <- TransDef %>%
   ggplot(aes(x = DATE, y = Trans, color = Stand)) + geom_line()
 print(RiparianTransDefPlot)
 
+#Print out deficit numbers for various 
 sum(TransDef$transDefHill)
-sum(TransDef$transDefHill[between(TransDef$DATE, as.Date("2000-05-09"), as.Date("2000-06-10"))])
+sum(TransDef$transDefHill[between(TransDef$DATE, as.Date("2000-05-16"), as.Date("2000-06-9"))])
+sum(TransDef$transDefHill[between(TransDef$DATE, as.Date("2000-05-01"), as.Date("2000-07-10"))])
 sum(TransDef$transDefRip)
 sum(TransDef$transDef)
 ```

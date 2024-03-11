@@ -202,9 +202,9 @@ for (i in 1:length(WSvarnames)) {
 
 Look at individual model fits. Choose which model to plot based on best models output from slidingwin output and then use singlewin to get the specific model
 ```{r plotIndvModels}
-winOpen <- 95
-winClose <- 82
-ws <- 1 #Which watershed: WS1, WS2, WS3, WS9, WS10
+winOpen <- 356
+winClose <- 1
+ws <- 2 #Which watershed: WS1, WS2, WS3, WS9, WS10
 climVar <- "Precip" #Precip or VPD
 
 WSvarnames <- c("WS1minQAug","WS2minQAug","WS3minQAug", "WS9minQAug", "WS10minQAug")
