@@ -101,7 +101,7 @@ myCols = c("Post" = Post,
            "Pres4" = Pres4)
 
 #Figure 4
-Fig4 <- WS1QChange5YrMon %>% 
+Fig4a <- WS1QChange5YrMon %>% 
   ggplot(aes(x = Month, y = WS1dif, fill = Period)) +
   geom_bar(position = "dodge", stat = "identity") +
   geom_hline(yintercept = 0) +
@@ -110,13 +110,27 @@ Fig4 <- WS1QChange5YrMon %>%
         panel.grid.major = element_blank()) +
   labs(x = "", y = "\u0394 Runoff (mm/mon)") +
   scale_fill_manual(values = c(Post, Pres1, Pres2, Pres3, Pres4))
-print(Fig4)
+print(Fig4a)
+
+Fig4b <- WS1QChange5YrMon %>% 
+  ggplot(aes(x = Month, y = 100*(WS1dif/WS1pred), fill = Period)) +
+  geom_bar(position = "dodge", stat = "identity") +
+  geom_hline(yintercept = 0) +
+  theme_bw(base_size = 18) + 
+  theme(panel.grid.minor = element_blank(),
+        panel.grid.major = element_blank()) +
+  labs(x = "", y = "% \u0394 Runoff") +
+  scale_fill_manual(values = c(Post, Pres1, Pres2, Pres3, Pres4))
+print(Fig4b)
 ```
 
 Figure 5: Window analysis
 ```{r Figure5-ClimWin}
 #Load Data from HJAClimWin
 load(paste(FigDataPath,"ClimWinTile.RData", sep = ""))
+
+#Add other days so that x axis expands
+DateRangeModels <- data.frame(winDay = seq(ymd("2023/04/01"), ymd("2023/07/30"         )))
 
 #Panel A and B together
 Fig5 <- tileTopModels %>% 

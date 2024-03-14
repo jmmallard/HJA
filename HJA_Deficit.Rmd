@@ -183,9 +183,10 @@ WS1QChange5Yr <- allData %>%
 
 #Average by month for each five year period
 WS1QChange5YrMon <- WS1QChange5Yr %>% 
-  select(Period, WY, Month, WS1, WS1dif, WS1RelDif) %>% 
+  select(Period, WY, Month, WS1, WS1pred, WS1dif, WS1RelDif) %>% 
   group_by(Period, Month) %>% 
   summarise(WS1 = mean(WS1),
+            WS1pred = mean(WS1pred),
             WS1dif = mean(WS1dif),
             WS1RelDif = mean(WS1RelDif)) %>% 
   mutate(WYMonth = case_when(Month >= 10 ~ Month - 9,
@@ -193,14 +194,14 @@ WS1QChange5YrMon <- WS1QChange5Yr %>%
   arrange(Period, WYMonth) %>% 
   mutate(Month = factor(month.abb[Month], levels = c(month.abb[10:12], month.abb[1:9])))
 
+save(WS1QChange5YrMon, file = "ManuscriptDocuments/Figures/FigureData/WS1_Month_Deficit.RData")
+
 #Plot as grouped bars  
 WS1QChange5YrMonPlot <- WS1QChange5YrMon %>% 
   ggplot(aes(x = Month, y = WS1dif, fill = Period)) +
   geom_bar(position = "dodge", stat = "identity")
 print(WS1QChange5YrMonPlot)
   
-save(WS1QChange5YrMon, file = "ManuscriptDocuments/Figures/FigureData/WS1_Month_Deficit.RData")
-
 #Four growing season deficits for post 2000
 WS1QChange5YrGS <- WS1QChange5YrMon %>% 
   filter(between(WYMonth, 8, 11)) %>% 
