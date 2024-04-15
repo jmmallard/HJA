@@ -295,9 +295,9 @@ WS1_Comp_OET <- WS1_All_OET %>%
 
 #Over the whole time series
 WS1_Comp_OET_TS <- WS1_Comp_OET %>% 
-  ggplot(aes(x = DATE, y = Diff)) +
+  ggplot(aes(x = DATE, y = DiffPer)) +
     geom_point() +
-    xlab("DATE") + ylab("Diff ET (mm or %)") + ggtitle("WS1 All ET - WS1 Riparian ET")
+    xlab("DATE") + ylab("Diff ET (%)") + ggtitle("WS1 All ET - WS1 Riparian ET")
 
 #Looking at monthly summaries
 WS1_Comp_OET_ByMonth <- WS1_Comp_OET %>% 
@@ -310,7 +310,7 @@ WS1_Comp_OET_ByMonth <- WS1_Comp_OET %>%
          DiffPerMon = 100 * (AllMon - RipMon)/AllMon) %>% 
   ggplot(aes(x = Month, y = DiffPerMon)) +
     geom_point() +
-    xlab("Month") + ylab("Diff ET (mm or %)") + ggtitle("WS1 All ET - WS1 Riparian ET")
+    xlab("Month") + ylab("Diff ET (%)") + ggtitle("WS1 All ET - WS1 Riparian ET")
 
 #Plots
 print(WS1_Comp_OET_TS)

@@ -129,12 +129,18 @@ Figure 5: Window analysis
 #Load Data from HJAClimWin
 load(paste(FigDataPath,"ClimWinTile.RData", sep = ""))
 
-#Add other days so that x axis expands
-DateRangeModels <- data.frame(winDay = seq(ymd("2023/04/01"), ymd("2023/07/30"         )))
+#Add other days so that x axis expands and filter out WS3
+DateRangeModels <- data.frame(winDay = rep(seq(ymd("2023/04/01"), ymd("2023/07/30"), by = "days"), times =4)) %>% 
+  arrange(winDay) %>% 
+  mutate(WS = rep_len(c("WS1", "WS1", "WS2", "WS2"), nrow(.)),
+         climVar = rep_len(c("precip", "vpd"), nrow(.)),
+         nModDay = 0) %>%
+  filter(!(winDay %in% unique(tileTopModels$winDay))) %>% 
+  bind_rows(tileTopModels) %>% 
+  filter(WS != "WS3")
 
 #Panel A and B together
-Fig5 <- tileTopModels %>% 
-  filter(WS != "WS3") %>% 
+Fig5 <- DateRangeModels %>% 
   ggplot(aes(x = winDay, y = WS, fill = nModDay)) +
   geom_tile() + facet_wrap(~ climVar) +
   theme_bw(base_size = myTxtSz) +
@@ -142,7 +148,7 @@ Fig5 <- tileTopModels %>%
        y = "",
        fill = "n(Win)"
        ) +
-  scale_x_date(expand = c(0,0), date_labels = "%b %e")
+  scale_x_date(expand = c(0,0), date_labels = "%b")
 
 print(Fig5)
 ```
