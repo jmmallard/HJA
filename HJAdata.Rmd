@@ -4,7 +4,7 @@ author: "Mallard"
 date: "10/24/2022"
 output: html_document
 ---
-Outputs of this script are:
+R variable outputs are:
 - allData: combined Q and met daily data
 - allQData: daily Q data from WS1,2,3,10
 - met: daily all met variables including precip, temp, vpd (max min mean of the latter two)
@@ -26,10 +26,10 @@ library(ggpubr)
 library(ggthemes)
 ```
 
-Input data catalog:
-- HF00402: Flow data, daily runoff in (normalized to area)
+Input data from HJA online data portal:
+- HF00402: Flow data, daily runoff, inches (normalized to area)
 - MS00103: Precip data, mm
-- HT00401: Temp @ gauges, deg C [per SteveW likely to be lower quality temp enclosures]
+- HT00401: Temp @ gauges, deg C [per SMW likely to be lower quality temp enclosures]
 - MS00101: Daily (min/max/mean) Temp @ met stations, deg C
 - MS00108: vpd (min/max/mean) @ met stations, mb
 - MS00118: vpd (60 min mean) @m met station, mb
@@ -43,7 +43,9 @@ vpdRaw <- read.csv("Data/MS00108_v9.csv")
 rhRaw <- read.csv("Data/MS00102_v9.csv")
 ```
 
-Per Steve Wondzell PRIMET is the station to use for precip, CS2MET is likely a bit too overgrown and may be undercatching. PRIMET also site to use for vpd and temp per Chris Daly.
+MET DATA
+
+Per Steve Wondzell PRIMET is the station to use for precip, CS2MET is likely a bit too overgrown and may be undercatching. PRIMET also site to use for vpd/temp per Chris Daly.
 
 Filter and restructure met:
 - Only one site
@@ -96,17 +98,20 @@ met <- metList %>%
 rm(metList) #Cleanup environment
 ```
 
+RUNOFF DATA AND COMBINED MET/RUNOFF DATA
+
 Now lets put some datasets together for multiple watersheds (including WS1)
 - WSs 1,2,3,9,10
 - Total Q (in inches), rather than mean, max, min
 - Convert DATE from character to date format
 - Convert inches to mm
-- Reformat as a wide table
+- Reformat as a wide table with WS name as a column name
 - Set dates past 2022 back to 20th century (caused by 2 digit dates in raw data)
 - Reduce to common days b/n met and q, but not all common days for watersheds
 - Add water year column
 - Merge with "met" variable from "metData" chunk to record length of met data
   - This adds precip, temp (mean, max, min), and vpd (mean, max, min)
+  
 ```{r allWSdata}
 #Q data
 allQData <- qRaw %>% 
